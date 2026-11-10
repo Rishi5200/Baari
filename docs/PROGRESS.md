@@ -3,35 +3,38 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 0 — Bootstrap (**not complete**: three checks need Docker, which isn't working yet)
+Phase 0 — Bootstrap (**one item left: CI has never run on GitHub**)
 
 ## Done
 - Parent POM: Java 21, Spring Boot 4.1.2, Modulith 2.1.2, Spotless (palantir), JaCoCo, Surefire (`*Test`), Failsafe (`*IT`)
 - Modules `baari-app` and `baari-simulator` (placeholder main), Maven wrapper 3.9.16
 - App skeleton: `BaariApplication`, `common` (injected `Clock`, `Ids`, `DomainException` + ProblemDetail advice)
 - Flyway `V1__clinic.sql`; `application.yml` and `application-dev.yml`
-- Tests: `MutableClock`, `AbstractIntegrationTest` (singleton Postgres/Redis/Kafka), `ApplicationSmokeIT`, Modulith `verify()`
+- Tests: `MutableClock`, `AbstractIntegrationTest` (singleton Postgres 17 / Redis 7 / Kafka), `ApplicationSmokeIT`, Modulith `verify()`
 - `ops/docker-compose.yml`, `ops/prometheus.yml`, `.github/workflows/ci.yml`, `.gitattributes`
 - ADR 0001
-- Verified locally: 8 unit tests pass (incl. Modulith verify); Spotless rejects a badly formatted file and passes once it's removed; `docker compose config` validates
+
+## Verified locally (2026-11-10, Docker 29.9.3)
+- `./mvnw verify`: BUILD SUCCESS. 8 unit tests, Modulith verify, and 2 integration tests (`ApplicationSmokeIT`: health UP, Flyway V1 applied) all pass
+- Dev profile: app started against the compose stack, `/actuator/health` = 200 UP, `flyway_schema_history` has V1 with success = true
+- Spotless fails on a badly formatted file and passes after it is removed
+
+## Bugs found and fixed while verifying
+- Failsafe was only in `pluginManagement`, so `*IT` tests never ran and the earlier "green" build proved nothing about them. Now active.
+- Java files were committed with CRLF, which Spotless rejects under `.gitattributes` (`eol=lf`). Repo now has `core.autocrlf=false` and sources are LF.
 
 ## In progress
-- Waiting on Docker Desktop (see open questions)
-
-## Not verified yet (needs Docker)
-- `./mvnw verify` with integration tests: `ApplicationSmokeIT` compiles but has never run, so the Testcontainers setup (Postgres 17, Redis 7, `apache/kafka:4.0.0`) and Flyway applying V1 are unproven
-- App starts with the dev profile, health UP (needs `docker compose -f ops/docker-compose.yml up -d`)
-- CI is green on GitHub (workflow written, never run; repo has no remote yet)
+- Nothing
 
 ## Next
-1. Get Docker working, run `./mvnw verify` and the dev-profile start, fix whatever breaks
-2. Add a GitHub remote, push, confirm CI is green
-3. Tick the three "Done when" boxes, tag `phase-0`, then start Phase 1
+1. Add a GitHub remote, push, confirm CI is green (the last open Phase 0 item). Then tag `phase-0`
+2. Phase 1 — Clinics, staff & auth
 
 ## Open questions for the user
-- Docker Desktop crashes on start (stale `dockerInference` and `userAnalyticsOtlpHttp.sock` files in `%LOCALAPPDATA%\Docker\run` can't be deleted: error 1920). Restart the PC or delete them as Administrator.
-- GitHub remote for CI: which repo/account?
+- GitHub remote for CI: which repo/account? (I won't create or push without your OK.)
+- Port 8080 on this machine is held by an unrelated process (`AgentService`, PID 5688), so the app can't use its default port here. Run it with `--server.port=8081` locally, or tell me if you want a different default.
 - Prometheus and Grafana images use `:latest` for now; pin versions in Phase 8?
+- The compose stack (`ops-*` containers) is left running; stop with `docker compose -f ops/docker-compose.yml down`.
 
 ## Notes / decisions
 - `Ids.newId()` uses random UUIDs, not UUIDv7: UUIDv7 needs the current time and the only allowed time source is an injected `Clock`.
@@ -40,4 +43,5 @@ Phase 0 — Bootstrap (**not complete**: three checks need Docker, which isn't w
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
-- 2026-11-10 — Phase 0 built without Docker: POMs, wrapper, skeleton, test infra, ops files, CI, ADR 0001. Integration tests unrun. Next: fix Docker, run full verify, push and check CI.
+- 2026-11-10 (later) — Docker fixed. Full verify with ITs green, dev profile healthy, Failsafe and line-ending bugs fixed. Next: remote + CI, then Phase 1.
+- 2026-11-10 — Phase 0 built without Docker: POMs, wrapper, skeleton, test infra, ops files, CI, ADR 0001. Integration tests unrun.
