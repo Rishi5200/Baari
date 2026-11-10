@@ -1,0 +1,5 @@
+# Dev profile: local docker compose services (ops/docker-compose.yml).
+# Demo clinic seed data and dev logins are added in Phase 1.
+logging:
+  level:
+    com.baari: DEBUG

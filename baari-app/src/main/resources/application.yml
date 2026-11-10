@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: baari
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${BAARI_DB_URL:jdbc:postgresql://localhost:5432/baari}
+    username: ${BAARI_DB_USER:baari}
+    password: ${BAARI_DB_PASSWORD:baari}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  data:
+    redis:
+      host: ${BAARI_REDIS_HOST:localhost}
+      port: 6379
+  kafka:
+    bootstrap-servers: ${BAARI_KAFKA_BOOTSTRAP:localhost:9092}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
