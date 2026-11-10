@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  # The app runs on the host in dev, so Prometheus reaches it via host.docker.internal.
+  - job_name: baari
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
