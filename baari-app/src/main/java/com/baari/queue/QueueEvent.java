@@ -12,7 +12,8 @@ public sealed interface QueueEvent
         permits QueueDayEvents.QueueDayOpened,
                 QueueDayEvents.QueueDayPaused,
                 QueueDayEvents.QueueDayResumed,
-                QueueDayEvents.QueueDayClosed {
+                QueueDayEvents.QueueDayClosed,
+                TokenEvents.TokenJoined {
 
     UUID eventId();
 

@@ -27,6 +27,12 @@ spring:
         namespace: baari:session
 
 baari:
+  queue: # PLAN §14; the same values are the defaults in QueueProperties
+    default-service-minutes: 6
+    no-show-grace-minutes: 3
+    recall-insert-offset: 2
+    max-consecutive-priority: 2
+    max-open-tokens: 300
   privacy:
     # Required outside dev/test; empty here so startup fails with a clear message if unset.
     data-key: ${BAARI_DATA_KEY:}         # base64 of 32 random bytes (AES-256)

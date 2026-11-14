@@ -17,11 +17,9 @@ import com.baari.queue.internal.TokenRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,10 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class QueueDayService {
-
-    /** Statuses day close still has to deal with. */
-    private static final Set<TokenStatus> OPEN_TOKEN_STATUSES =
-            EnumSet.of(TokenStatus.WAITING, TokenStatus.CALLED, TokenStatus.NO_SHOW, TokenStatus.IN_CONSULTATION);
 
     private final QueueAccess access;
     private final QueueDayRepository days;
@@ -151,7 +145,7 @@ public class QueueDayService {
         int expired = 0;
         int autoCompleted = 0;
         List<TokenEntity> open =
-                tokens.findByQueueDayIdAndStatusInOrderBySortKeyAscNumberAsc(day.getId(), OPEN_TOKEN_STATUSES);
+                tokens.findByQueueDayIdAndStatusInOrderBySortKeyAscNumberAsc(day.getId(), TokenStatus.OPEN);
         for (TokenEntity token : open) {
             TokenStatus before = token.closeForDay(now);
             EventType type = token.getStatus() == TokenStatus.EXPIRED ? EventType.EXPIRED : EventType.COMPLETED;

@@ -67,6 +67,23 @@ public class QueueDayEntity extends AssignedIdEntity {
         return status;
     }
 
+    public LocalDate getServiceDate() {
+        return serviceDate;
+    }
+
+    public int getConsecutivePriorityServed() {
+        return consecutivePriorityServed;
+    }
+
+    /**
+     * Takes the next token number. The caller holds the row lock, so numbers are unique and
+     * gap-free: if the issuing transaction rolls back, the increment rolls back with it (ADR 0003).
+     */
+    public int nextNumber() {
+        lastNumber++;
+        return lastNumber;
+    }
+
     /** Takes the next event sequence number. The caller holds the row lock, so this can't race. */
     public long nextEventSeq() {
         lastEventSeq++;

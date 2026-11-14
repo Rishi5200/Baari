@@ -6,6 +6,7 @@ import com.baari.queue.Priority;
 import com.baari.queue.TokenFlag;
 import com.baari.queue.TokenSource;
 import com.baari.queue.TokenStatus;
+import com.baari.queue.TokenView;
 import com.baari.queue.VisitType;
 import com.baari.queue.internal.TokenCommand.CloseDay;
 import com.baari.queue.internal.Transition.Allowed;
@@ -120,6 +121,55 @@ public class TokenEntity extends AssignedIdEntity {
 
     protected TokenEntity() {}
 
+    private TokenEntity(UUID id) {
+        super(id);
+    }
+
+    /** Patient details of a new token. The phone fields are all null or all set. */
+    public record Patient(String name, String phoneE164, byte[] phoneHash, String phoneLast4) {
+        public Patient {
+            Objects.requireNonNull(name, "name");
+            if ((phoneE164 == null) != (phoneHash == null) || (phoneE164 == null) != (phoneLast4 == null)) {
+                throw new IllegalArgumentException("phone fields must be all set or all null");
+            }
+        }
+    }
+
+    /** A new WAITING token. The caller took {@code number} from the locked queue day. */
+    public static TokenEntity issue(
+            UUID id,
+            UUID queueDayId,
+            UUID clinicId,
+            int number,
+            String publicCode,
+            Patient patient,
+            VisitType visitType,
+            Priority priority,
+            TokenSource source,
+            String consentVersion,
+            UUID idempotencyKey,
+            Instant joinedAt) {
+        TokenEntity token = new TokenEntity(id);
+        token.queueDayId = Objects.requireNonNull(queueDayId, "queueDayId");
+        token.clinicId = Objects.requireNonNull(clinicId, "clinicId");
+        token.number = number;
+        token.sortKey = TokenView.initialSortKey(number);
+        token.publicCode = Objects.requireNonNull(publicCode, "publicCode");
+        token.patientName = patient.name();
+        token.phone = patient.phoneE164();
+        token.phoneHash =
+                patient.phoneHash() == null ? null : patient.phoneHash().clone();
+        token.phoneLast4 = patient.phoneLast4();
+        token.visitType = Objects.requireNonNull(visitType, "visitType");
+        token.priority = Objects.requireNonNull(priority, "priority");
+        token.status = TokenStatus.WAITING;
+        token.source = Objects.requireNonNull(source, "source");
+        token.consentVersion = consentVersion;
+        token.idempotencyKey = idempotencyKey;
+        token.joinedAt = Objects.requireNonNull(joinedAt, "joinedAt");
+        return token;
+    }
+
     public UUID getQueueDayId() {
         return queueDayId;
     }
@@ -130,6 +180,27 @@ public class TokenEntity extends AssignedIdEntity {
 
     public TokenStatus getStatus() {
         return status;
+    }
+
+    public String getPublicCode() {
+        return publicCode;
+    }
+
+    public Priority getPriority() {
+        return priority;
+    }
+
+    public VisitType getVisitType() {
+        return visitType;
+    }
+
+    public TokenSource getSource() {
+        return source;
+    }
+
+    /** The part of the token queue ordering needs (no patient details). */
+    public TokenView toTokenView() {
+        return new TokenView(getId(), number, priority, status, sortKey, joinedAt);
     }
 
     public List<String> getFlags() {

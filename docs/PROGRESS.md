@@ -10,7 +10,7 @@ Phase 2 — Queue core (in progress). Phase 1 complete, tagged `phase-1`.
 2. [x] `NextTokenPolicy` + §5 tests (incl. 1,000 random queues) + projection + recall sort key
 3. [x] `common.crypto`: phone normalisation, AES-GCM, HMAC hash, `Masking.phone()`, JPA converter, keys from config
 4. [x] V3 migration (queue_day, token, token_event, outbox_event) + `QueueDayService` (unit tests not run, see below)
-5. [ ] `TokenService` join / walk-in + concurrency tests 1, 2, 3, 6
+5. [x] `TokenService` join / walk-in + concurrency tests 1, 2, 3, 6 (unit tests not run, see below)
 6. [ ] Staff transitions (call-next row lock, start, complete, no-show, recall, cancel, priority) + tests 4, 5
 7. [ ] REST APIs (Appendix A) + journeys J1–J7 + ADRs 0003–0005
 
@@ -52,9 +52,10 @@ At the user's request, from task 4 on the build ran without unit tests:
 `./mvnw verify -Dtest=NONE -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.skip=true`.
 That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 100% branch check.
 - Task 4: integration tests 72/72 green, Spotless clean; unit tests, Modulith verify and JaCoCo check not run.
+- Task 5: integration tests 106/106 green (concurrency tests 1, 2, 3, 6 each passed 5×), Spotless clean; unit tests, Modulith verify and JaCoCo check not run. No new unit tests were written for `DisplayCode` / `PublicCodes` (covered through `TokenServiceIT` only).
 
 ## In progress
-- Phase 2, task 5: `TokenService` join / walk-in + concurrency tests 1, 2, 3, 6
+- Phase 2, task 6: staff transitions (call-next row lock, start, complete, no-show, recall, cancel, priority) + tests 4, 5
 
 ## Next
 1. Phase 2 tasks 4–7 (see plan above)
@@ -106,9 +107,20 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
   - Day close writes one `token_event` per changed token (EXPIRED, or COMPLETED for auto-closed consultations) and one `QueueDayClosed` outbox event with the counts; no per-token outbox events. Close events are recorded as STAFF with the closing user's id.
   - Outbox row id = event id; aggregate = queue day; partition key = queue day id; event type = record name. `flags` stores `TokenFlag` names (upper case).
   - New `clinic.QueueDirectory` gives the queue module a queue and its clinic's time zone (no permission check; the queue module checks access).
+- Phase 2 token issuance choices (PLAN §6.1 / Appendix A leave these open):
+  - Order inside the transaction: lock the queue day row, then check idempotency key → day status → active token for the phone → open-token limit, then take the number. Everything is checked under the lock, so the unlocked pre-check PLAN mentions isn't needed, and no number is ever burned (a failed request rolls its number back). The unique constraints stay as a backstop: on a violation the whole transaction is retried once so the checks see the winning row. That retry path isn't exercised by a test (it can't be reached while every issuer takes the lock).
+  - A retry with the same idempotency key returns its token whatever happened since, even after the day closed (status EXPIRED, position null).
+  - While a day is PAUSED, QR joins get 423 but reception can still add walk-ins. **Confirm this is what you want.**
+  - Open-token limit (`max-open-tokens`, 300) counts WAITING, CALLED, IN_CONSULTATION and NO_SHOW (same set as the phone index); over the limit → 409 `queue-full`. Applies to walk-ins too.
+  - Patients joining by QR are always NORMAL; reception picks the priority for walk-ins. Name required (≤ 60 chars) for both; phone optional; walk-in idempotency key optional.
+  - `position` is 1-based (1 = called next), computed with `NextTokenPolicy.projectOrder`.
+  - Display code `A-017`: prefix + number padded to 3 digits, longer above 999. Public code: 22 random base62 characters (`SecureRandom`).
+  - 409 `already-in-queue` names only the other token's display code, never its public code.
+  - `baari.queue.*` settings bound in `QueueProperties` with the PLAN §14 defaults.
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
+- 2026-11-14 (Phase 2) — Task 5: `TokenService` join and walk-in (lock → checks → number), `QueueProperties`, display/public codes, `TokenJoined` event, 34 integration tests incl. concurrency tests 1, 2, 3, 6 ×5. Unit tests not run (user's request). Next: staff transitions.
 - 2026-11-14 (Phase 2) — Task 4: V3 migration, `QueueDayService` (open/pause/resume/close), `EventLog` (token_event + outbox), Token/QueueDay entities, 17 integration tests. Unit tests not run (user's request). Next: `TokenService` join / walk-in.
 - 2026-11-14 (Phase 2) — Task 3: `common.crypto` (PhoneNumber, Masking, FieldCipher AES-256-GCM, PhoneHasher HMAC-SHA256, EncryptedStringConverter, startup key checks), 48 unit tests. Next: V3 migration + `QueueDayService`.
 - 2026-11-14 (Phase 2) — Task 2: `NextTokenPolicy` (next, projectOrder, recallSortKey), 22 unit tests incl. 1,000 random queues; added to the 100% branch rule. Next: `common.crypto`.
