@@ -65,6 +65,11 @@
       <groupId>org.springframework.modulith</groupId>
       <artifactId>spring-modulith-starter-core</artifactId>
     </dependency>
+    <!-- BCrypt for staff passwords (PLAN §9.1). The full security starter arrives with login. -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-crypto</artifactId>
+    </dependency>
 
     <!-- test -->
     <dependency>

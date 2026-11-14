@@ -2,7 +2,14 @@ package com.baari.common;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.ValidatorFactory;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.net.URI;
+import java.util.Set;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -26,6 +33,23 @@ class ProblemDetailAdviceTest {
         assertThat(problem.getStatus()).isEqualTo(409);
         assertThat(problem.getType()).isEqualTo(URI.create("https://baari.app/problems/illegal-transition"));
         assertThat(problem.getDetail()).isEqualTo("Cannot do that now.");
+    }
+
+    private record Login(
+            @NotBlank String username, @Size(min = 8) String password) {}
+
+    @Test
+    void validationFailureListsFieldsButNotRejectedValues() {
+        Set<ConstraintViolation<Login>> violations;
+        try (ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
+            violations = factory.getValidator().validate(new Login("", "hunter2"));
+        }
+
+        ProblemDetail problem = advice.handleConstraintViolation(new ConstraintViolationException(violations));
+
+        assertThat(problem.getStatus()).isEqualTo(400);
+        assertThat(problem.getType()).isEqualTo(URI.create("https://baari.app/problems/validation"));
+        assertThat(problem.getDetail()).contains("username:", "password:").doesNotContain("hunter2");
     }
 
     @Test

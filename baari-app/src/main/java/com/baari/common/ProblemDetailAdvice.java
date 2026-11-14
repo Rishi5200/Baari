@@ -1,6 +1,8 @@
 package com.baari.common;
 
+import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,26 @@ class ProblemDetailAdvice extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(ex.status(), ex.getMessage());
         problem.setType(URI.create(TYPE_BASE + ex.problemSlug()));
         return problem;
+    }
+
+    /**
+     * Bean Validation failures on {@code @Validated} services. Lists the failing fields and
+     * messages, never the rejected values (they may be personal data or passwords).
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    ProblemDetail handleConstraintViolation(ConstraintViolationException ex) {
+        String detail = ex.getConstraintViolations().stream()
+                .map(v -> lastNode(v.getPropertyPath().toString()) + ": " + v.getMessage())
+                .sorted()
+                .collect(Collectors.joining("; "));
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        problem.setType(URI.create(TYPE_BASE + "validation"));
+        return problem;
+    }
+
+    /** "createDoctor.details.name" → "name". */
+    private static String lastNode(String path) {
+        return path.substring(path.lastIndexOf('.') + 1);
     }
 
     /** Last resort. The client gets no stack trace and no internal message. */
