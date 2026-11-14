@@ -1,5 +1,22 @@
 # Dev profile: local docker compose services (ops/docker-compose.yml).
-# Demo clinic seed data and dev logins are added in Phase 1.
 logging:
   level:
     com.baari: DEBUG
+
+# Demo clinic seeded at startup (DevSeed). These logins exist ONLY in the dev profile:
+# never reuse these passwords anywhere real.
+baari:
+  dev-seed:
+    platform-admin:
+      username: platform
+      password: dev-platform-pass
+    clinic-admin:
+      username: sharma-admin
+      password: dev-admin-pass
+    doctor:
+      username: dr-sharma
+      password: dev-doctor-pass
+    receptionist:
+      username: reception
+      password: dev-reception-pass
+    display-key: dev-display-key
