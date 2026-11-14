@@ -26,6 +26,12 @@ spring:
       redis:
         namespace: baari:session
 
+baari:
+  privacy:
+    # Required outside dev/test; empty here so startup fails with a clear message if unset.
+    data-key: ${BAARI_DATA_KEY:}         # base64 of 32 random bytes (AES-256)
+    phone-pepper: ${BAARI_PHONE_PEPPER:} # base64 of at least 32 random bytes (HMAC)
+
 server:
   servlet:
     session:

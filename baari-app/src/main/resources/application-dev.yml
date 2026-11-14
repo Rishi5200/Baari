@@ -20,3 +20,7 @@ baari:
       username: reception
       password: dev-reception-pass
     display-key: dev-display-key
+  # Dev-only keys, public in the repo: anything encrypted with them is not secret.
+  privacy:
+    data-key: OWNFhAcQhzkzwfjcK7Z1tUMBWV2RonHVpMngo3OebF0=
+    phone-pepper: KQC2/ppDE1uKr/qdBYoSko8qrgzEwWRCuoMMTKa8w0I=

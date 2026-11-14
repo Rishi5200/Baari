@@ -12,7 +12,13 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * every integration test (cheaper than one set per class). Ryuk removes them when the JVM exits.
  * There is deliberately no H2 or in-memory substitute: we rely on Postgres-specific features.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {
+            // Test-only keys (public in the repo), so ITs don't need env vars.
+            "baari.privacy.data-key=wjseMCd5C/bpklpkXri3tTXUCqnB82QCqpUO2SA9E8c=",
+            "baari.privacy.phone-pepper=KWEThGoIRPWCxTVk52s4rCstHYYutasUJGVb2tig9EM="
+        })
 public abstract class AbstractIntegrationTest {
 
     @ServiceConnection

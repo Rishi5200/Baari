@@ -8,7 +8,7 @@ Phase 2 — Queue core (in progress). Phase 1 complete, tagged `phase-1`.
 ## Phase 2 plan (7 tasks)
 1. [x] `TokenStateMachine` + every status × command test + JaCoCo 100% branch rule
 2. [x] `NextTokenPolicy` + §5 tests (incl. 1,000 random queues) + projection + recall sort key
-3. [ ] `common.crypto`: phone normalisation, AES-GCM, HMAC hash, `Masking.phone()`
+3. [x] `common.crypto`: phone normalisation, AES-GCM, HMAC hash, `Masking.phone()`, JPA converter, keys from config
 4. [ ] V3 migration (queue_day, token, token_event, outbox_event) + `QueueDayService`
 5. [ ] `TokenService` join / walk-in + concurrency tests 1, 2, 3, 6
 6. [ ] Staff transitions (call-next row lock, start, complete, no-show, recall, cancel, priority) + tests 4, 5
@@ -48,10 +48,10 @@ Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; r
 - Boot 4 ignores the old property `spring.session.redis.namespace`; the right one is `spring.session.data.redis.namespace`. Sessions were silently using the default key prefix; the session test now checks the keys exist.
 
 ## In progress
-- Phase 2, task 3: `common.crypto`
+- Phase 2, task 4: V3 migration + `QueueDayService`
 
 ## Next
-1. Phase 2 tasks 3–7 (see plan above)
+1. Phase 2 tasks 4–7 (see plan above)
 
 ## Open questions for the user
 - Nothing stops a clinic admin from disabling or demoting their own account (could leave a clinic with no admin). Add a guard?
@@ -84,9 +84,17 @@ Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; r
   - Equal sort keys (two recalls behind the same token) are ordered by token number.
   - `maxConsecutivePriority` may be 0 (NORMAL always first); `recallInsertOffset` must be at least 1.
   - `NextTokenPolicy`, `TokenView`, `QueueSnapshot` are public in `queue` because the ETA module will reuse them.
+- Phase 2 crypto choices (PLAN §9.4 leaves these open):
+  - Accepted phone input: Indian numbers with or without +91 / 91 / 0091 / leading 0, spaces, dashes, dots, brackets; must be a mobile (10 digits, starting 6–9). Other countries need `+` or `00`. Error message never repeats the input (`invalid-phone`, 400).
+  - Encrypted value layout: version byte (1) + 12-byte random IV + ciphertext + 16-byte GCM tag. The version byte is there for future key rotation.
+  - `BAARI_PHONE_PEPPER` is base64, at least 32 bytes (PLAN didn't fix a format). Both keys are validated at startup; missing or bad keys stop the app and name the env var, never the value.
+  - Dev keys in `application-dev.yml`, test keys in `AbstractIntegrationTest` (both public, labelled as such).
+  - `common.crypto` is a Modulith named interface so `queue` can use it.
+  - `PhoneNumber.toString()` is masked, so an accidental log line can't leak a number.
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
+- 2026-11-14 (Phase 2) — Task 3: `common.crypto` (PhoneNumber, Masking, FieldCipher AES-256-GCM, PhoneHasher HMAC-SHA256, EncryptedStringConverter, startup key checks), 48 unit tests. Next: V3 migration + `QueueDayService`.
 - 2026-11-14 (Phase 2) — Task 2: `NextTokenPolicy` (next, projectOrder, recallSortKey), 22 unit tests incl. 1,000 random queues; added to the 100% branch rule. Next: `common.crypto`.
 - 2026-11-14 (Phase 2) — Task 1: `TokenStateMachine` (pure), 104 unit tests, JaCoCo check enforces 100% branch coverage (48/48). Next: `NextTokenPolicy`.
 - 2026-11-14 (end) — Phase 1 pushed, CI green, tagged `phase-1`. Next: Phase 2.
