@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title th:text="${queue.name()} + ' · Baari'">Console · Baari</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <th:block th:replace="~{layout :: csrfMeta}"></th:block>
+</head>
+<body class="console">
+<header th:replace="~{layout :: topbar}"></header>
+<main id="console" class="wide"
+      th:attr="data-queue-id=${queue.id()},data-stream=@{/api/staff/queues/{id}/stream(id=${queue.id()})},data-api=@{/api/staff}">
+  <div class="page-head">
+    <h1 th:text="${queue.name()}">General OPD</h1>
+    <span class="pill" id="day-status" th:text="#{console.day.notOpened}">Not opened today</span>
+  </div>
+  <p class="conn" id="conn" hidden th:text="#{console.offline}">Connection lost.</p>
+  <p class="alert error" id="toast" role="alert" hidden></p>
+
+  <div class="toolbar">
+    <button type="button" id="day-open" hidden th:text="#{console.day.open}">Open the day</button>
+    <button type="button" id="day-pause" class="secondary" hidden th:text="#{console.day.pause}">Pause</button>
+    <button type="button" id="day-resume" class="secondary" hidden th:text="#{console.day.resume}">Resume</button>
+    <button type="button" id="day-close" class="danger" hidden th:text="#{console.day.close}">Close the day</button>
+  </div>
+
+  <div class="callbar">
+    <label th:if="${chooseDoctor}">
+      <span th:text="#{console.doctor}">Calling doctor</span>
+      <select id="doctor">
+        <option th:each="d : ${queueDoctors}" th:value="${d.id()}"
+                th:text="${d.name()} + (${d.roomLabel() != null} ? ' · ' + ${d.roomLabel()} : '')">Dr. Name</option>
+      </select>
+    </label>
+    <button type="button" id="call-next" class="big" th:text="#{console.callNext} + ' (N)'">Call next (N)</button>
+  </div>
+
+  <form id="walkin" class="walkin">
+    <h3 th:text="#{console.walkIn}">Add walk-in</h3>
+    <input name="name" maxlength="60" required th:placeholder="#{console.walkIn.name}">
+    <input name="phone" type="tel" maxlength="30" th:placeholder="#{console.walkIn.phone}">
+    <select name="visitType">
+      <option value="NEW" th:text="#{console.visit.NEW}">New</option>
+      <option value="FOLLOW_UP" th:text="#{console.visit.FOLLOW_UP}">Follow-up</option>
+    </select>
+    <select name="priority">
+      <option value="NORMAL" th:text="#{console.priority.NORMAL}">Normal</option>
+      <option value="PRIORITY" th:text="#{console.priority.PRIORITY}">Priority</option>
+      <option value="EMERGENCY" th:text="#{console.priority.EMERGENCY}">Emergency</option>
+    </select>
+    <button type="submit" th:text="#{console.walkIn.add}">Add</button>
+  </form>
+
+  <section><h2 th:text="#{console.section.called}">Called</h2><ul class="tokens" id="list-called"></ul></section>
+  <section><h2 th:text="#{console.section.inConsultation}">In consultation</h2><ul class="tokens" id="list-consult"></ul></section>
+  <section><h2 th:text="#{console.section.waiting}">Waiting</h2><ul class="tokens" id="list-waiting"></ul></section>
+  <section><h2 th:text="#{console.section.noShow}">No-show</h2><ul class="tokens" id="list-noshow"></ul></section>
+  <section><h2 th:text="#{console.section.finished}">Finished today</h2><ul class="tokens finished" id="list-finished"></ul></section>
+
+  <p class="muted small" th:text="#{console.shortcuts}">Shortcuts</p>
+</main>
+
+<script th:inline="javascript">
+  window.BAARI_T = {
+    dayStatus: {
+      NOT_OPENED: /*[[#{console.day.notOpened}]]*/ 'Not opened today',
+      OPEN: /*[[#{console.day.OPEN}]]*/ 'Open',
+      PAUSED: /*[[#{console.day.PAUSED}]]*/ 'Paused',
+      CLOSED: /*[[#{console.day.CLOSED}]]*/ 'Closed'
+    },
+    priority: {
+      NORMAL: /*[[#{console.priority.NORMAL}]]*/ 'Normal',
+      PRIORITY: /*[[#{console.priority.PRIORITY}]]*/ 'Priority',
+      EMERGENCY: /*[[#{console.priority.EMERGENCY}]]*/ 'Emergency'
+    },
+    visit: {
+      NEW: /*[[#{console.visit.NEW}]]*/ 'New',
+      FOLLOW_UP: /*[[#{console.visit.FOLLOW_UP}]]*/ 'Follow-up'
+    },
+    empty: /*[[#{console.empty}]]*/ 'Nobody',
+    start: /*[[#{console.start}]]*/ 'Start',
+    complete: /*[[#{console.complete}]]*/ 'Complete',
+    noShow: /*[[#{console.noShow}]]*/ 'No-show',
+    noShowConfirm: /*[[#{console.noShow.confirm}]]*/ 'Mark as no-show anyway?',
+    recall: /*[[#{console.recall}]]*/ 'Recall',
+    cancel: /*[[#{console.cancel}]]*/ 'Cancel',
+    cancelConfirm: /*[[#{console.cancel.confirm}]]*/ 'Cancel this token?',
+    callThis: /*[[#{console.callThis}]]*/ 'Call',
+    closeConfirm: /*[[#{console.day.close.confirm}]]*/ 'Close the queue for today?',
+    error: /*[[#{console.error}]]*/ 'Something went wrong.'
+  };
+</script>
+<script th:src="@{/js/baari.js}"></script>
+<script th:src="@{/js/console.js}" defer></script>
+</body>
+</html>

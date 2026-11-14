@@ -8,10 +8,11 @@ import java.util.Objects;
  *
  * @param doctors the queue's active doctors, by name
  */
-public record PublicQueue(QueueInfo info, String clinicName, List<DoctorView> doctors) {
+public record PublicQueue(QueueInfo info, String clinicSlug, String clinicName, List<DoctorView> doctors) {
 
     public PublicQueue {
         Objects.requireNonNull(info, "info");
+        Objects.requireNonNull(clinicSlug, "clinicSlug");
         Objects.requireNonNull(clinicName, "clinicName");
         doctors = List.copyOf(doctors);
     }

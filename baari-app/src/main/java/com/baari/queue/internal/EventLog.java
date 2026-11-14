@@ -2,11 +2,13 @@ package com.baari.queue.internal;
 
 import com.baari.common.Ids;
 import com.baari.queue.ActorType;
+import com.baari.queue.QueueChanged;
 import com.baari.queue.QueueEvent;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -29,10 +31,12 @@ public class EventLog {
 
     private final JdbcClient jdbc;
     private final JsonMapper json;
+    private final ApplicationEventPublisher publisher;
 
-    EventLog(JdbcClient jdbc, JsonMapper json) {
+    EventLog(JdbcClient jdbc, JsonMapper json, ApplicationEventPublisher publisher) {
         this.jdbc = jdbc;
         this.json = json;
+        this.publisher = publisher;
     }
 
     /**
@@ -68,6 +72,8 @@ public class EventLog {
                 .param("at", Sql.timestamptz(at))
                 .param("data", json.writeValueAsString(data))
                 .update();
+        // Listeners run after commit (PLAN §10.2), so a rolled-back change is never announced.
+        publisher.publishEvent(new QueueChanged(day.getQueueId(), day.getId(), seq));
         return seq;
     }
 

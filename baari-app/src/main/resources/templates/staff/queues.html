@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Queue console')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main>
+  <h1>Queue console</h1>
+  <p th:if="${#lists.isEmpty(queues)}" class="muted">No queues to run yet.</p>
+  <ul class="links" th:unless="${#lists.isEmpty(queues)}">
+    <li th:each="q : ${queues}">
+      <a th:href="@{/staff/queues/{id}(id=${q.id()})}" th:text="${q.name()}">General OPD</a>
+      <span class="muted" th:text="'(' + ${q.mode()} + ')'">(POOL)</span>
+    </li>
+  </ul>
+</main>
+</body>
+</html>

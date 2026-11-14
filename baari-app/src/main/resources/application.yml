@@ -39,6 +39,8 @@ baari:
     phone-pepper: ${BAARI_PHONE_PEPPER:} # base64 of at least 32 random bytes (HMAC)
 
 server:
+  # Behind Caddy: use X-Forwarded-* so generated links (poster) carry the public https host.
+  forward-headers-strategy: framework
   servlet:
     session:
       cookie:

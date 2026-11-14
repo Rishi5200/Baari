@@ -28,6 +28,7 @@
       </td>
       <td th:if="${isClinicAdmin}" class="actions">
         <a th:href="@{/admin/queues/{id}/edit(id=${q.id()})}">Edit</a>
+        <a th:href="@{/admin/queues/{id}/poster(id=${q.id()})}" target="_blank">Poster</a>
       </td>
     </tr>
     </tbody>

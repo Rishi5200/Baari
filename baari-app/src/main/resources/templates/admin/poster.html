@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Poster')}"></head>
+<body class="poster">
+<main>
+  <p class="no-print"><button type="button" onclick="window.print()">Print</button>
+    <a th:href="@{/admin/queues}">Back to queues</a></p>
+  <h1 th:text="${queue.clinicName()}">Sharma Clinic</h1>
+  <h2 th:text="${queue.info().queue().name()}">General OPD</h2>
+  <p class="lead">Skip the crowded waiting room.<br>Get your token on your phone and see when your turn comes.</p>
+  <p class="lead">अपने फ़ोन पर टोकन लें और देखें कि आपकी बारी कब आएगी।</p>
+  <p class="join-url" th:text="${joinUrl}">https://example.com/j/clinic/queue</p>
+  <p class="muted no-print">Open this address on a phone. A scannable QR code will be added once a QR library is approved.</p>
+</main>
+</body>
+</html>

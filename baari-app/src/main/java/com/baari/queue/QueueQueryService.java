@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +35,9 @@ public class QueueQueryService {
                     (TokenEntity t) -> t.getCalledAt() != null ? t.getCalledAt() : t.getConsultStartedAt(),
                     Comparator.nullsLast(Comparator.<Instant>naturalOrder()))
             .reversed();
+
+    /** How many upcoming codes the TV shows (PLAN §2.2). */
+    private static final int DISPLAY_NEXT = 5;
 
     private final QueueDirectory directory;
     private final QueueAccess access;
@@ -88,11 +92,8 @@ public class QueueQueryService {
             List<TokenEntity> order = TokenViews.inCallOrder(waiting(day), day, settings.policySettings());
             position = order.indexOf(token) + 1;
         }
-        List<String> nowServing = tokens
-                .findByQueueDayIdAndStatusInOrderBySortKeyAscNumberAsc(
-                        day.getId(), EnumSet.of(TokenStatus.CALLED, TokenStatus.IN_CONSULTATION))
-                .stream()
-                .sorted(LATEST_CALL_FIRST)
+        Map<UUID, String> rooms = directory.roomLabels(day.getQueueId());
+        List<String> nowServing = servingNow(day).stream()
                 .map(t -> TokenViews.displayCode(info, t))
                 .toList();
         return new PublicTokenView(
@@ -102,7 +103,57 @@ public class QueueQueryService {
                 position == null ? null : position - 1,
                 nowServing,
                 info.queue().name(),
-                day.getStatus());
+                day.getStatus(),
+                token.getServedByDoctorId() == null ? null : rooms.get(token.getServedByDoctorId()));
+    }
+
+    /** The queue a token belongs to, so the live stream knows which changes to listen for. */
+    @Transactional(readOnly = true)
+    public UUID queueIdOfToken(String publicCode) {
+        Objects.requireNonNull(publicCode, "publicCode");
+        TokenEntity token = tokens.findByPublicCode(publicCode).orElseThrow(() -> new NotFoundException("Token"));
+        return days.findById(token.getQueueDayId()).orElseThrow().getQueueId();
+    }
+
+    /**
+     * The TV board. Open to anyone holding the queue's display key; a wrong key and an unknown
+     * queue both answer "not found" so the screen's URL can't be used to probe ids.
+     */
+    @Transactional(readOnly = true)
+    public DisplayBoard displayBoard(UUID queueId, String displayKey) {
+        if (!directory.displayKeyMatches(queueId, displayKey)) {
+            throw new NotFoundException("Display");
+        }
+        QueueInfo info = directory.find(queueId).orElseThrow(() -> new NotFoundException("Display"));
+        Optional<QueueDayEntity> found = today(info);
+        if (found.isEmpty()) {
+            return new DisplayBoard(info.queue().name(), null, List.of(), List.of(), 0);
+        }
+        QueueDayEntity day = found.get();
+        Map<UUID, String> rooms = directory.roomLabels(queueId);
+        List<TokenEntity> waiting = TokenViews.inCallOrder(waiting(day), day, settings.policySettings());
+        return new DisplayBoard(
+                info.queue().name(),
+                day.getStatus(),
+                servingNow(day).stream()
+                        .map(t -> new DisplayBoard.Serving(
+                                TokenViews.displayCode(info, t),
+                                t.getServedByDoctorId() == null ? null : rooms.get(t.getServedByDoctorId())))
+                        .toList(),
+                waiting.stream()
+                        .limit(DISPLAY_NEXT)
+                        .map(t -> TokenViews.displayCode(info, t))
+                        .toList(),
+                waiting.size());
+    }
+
+    private List<TokenEntity> servingNow(QueueDayEntity day) {
+        return tokens
+                .findByQueueDayIdAndStatusInOrderBySortKeyAscNumberAsc(
+                        day.getId(), EnumSet.of(TokenStatus.CALLED, TokenStatus.IN_CONSULTATION))
+                .stream()
+                .sorted(LATEST_CALL_FIRST)
+                .toList();
     }
 
     /** Today's board for the staff console. */

@@ -65,3 +65,75 @@ button {
 
 .alert { padding: .75rem; border-left: 4px solid var(--accent); background: #fff; }
 .alert.error { border-color: var(--error); }
+
+/* ---------- Phase 3: patient pages, staff console, TV display, poster ---------- */
+
+.muted-title { font-size: 1rem; color: var(--muted); font-weight: 500; margin-bottom: 0; }
+.sub { margin-top: 0; color: var(--muted); font-weight: 500; }
+.small { font-size: .85rem; }
+.langs { text-align: right; margin: 0; }
+.conn { background: #fff4e5; border-left: 4px solid #b54708; padding: .5rem .75rem; }
+.alert[hidden], .conn[hidden], [hidden] { display: none !important; }
+
+button.big { width: 100%; padding: 1rem; font-size: 1.2rem; }
+button.secondary { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+button.danger { background: var(--error); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+label.check { display: flex; gap: .6rem; align-items: flex-start; }
+label.check input { width: auto; margin-top: .3rem; }
+
+/* token page */
+.code { font-size: 4.5rem; font-weight: 800; letter-spacing: .05em; margin: .2rem 0; text-align: center; color: var(--accent); }
+.status { font-size: 1.5rem; text-align: center; margin: 0; font-weight: 600; }
+.ahead { font-size: 1.2rem; text-align: center; }
+.serving { font-size: 1.6rem; font-weight: 700; }
+.called {
+  position: fixed; inset: 0; z-index: 10; background: var(--accent); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1rem;
+}
+.called .code { color: #fff; font-size: 7rem; }
+.called .room { font-size: 2rem; }
+
+/* console */
+main.wide { max-width: 72rem; }
+.pill { padding: .2rem .7rem; border-radius: 999px; background: #e4e7eb; font-weight: 600; }
+.pill.open { background: #d1fadf; }
+.pill.paused { background: #fef0c7; }
+.pill.closed { background: #fee4e2; }
+.toolbar, .callbar { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; margin: 1rem 0; }
+.callbar label { margin: 0; min-width: 14rem; }
+.callbar button.big { width: auto; padding: .8rem 2rem; }
+form.walkin { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; background: #fff; padding: .75rem; border: 1px solid #e4e7eb; }
+form.walkin h3 { margin: 0 .5rem 0 0; }
+form.walkin input, form.walkin select { width: auto; margin: 0; }
+ul.tokens { list-style: none; margin: 0 0 1rem; padding: 0; }
+li.token { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; padding: .5rem .75rem; background: #fff; border-bottom: 1px solid #e4e7eb; }
+li.token.emergency { border-left: 6px solid var(--error); }
+li.token.priority { border-left: 6px solid #b54708; }
+li.token .code { font-size: 1.3rem; margin: 0; text-align: left; letter-spacing: 0; color: var(--fg); }
+li.token .actions { margin-left: auto; display: flex; gap: .5rem; align-items: center; }
+li.token .actions select { width: auto; margin: 0; padding: .3rem; }
+li.token .actions button { padding: .4rem .8rem; }
+li.none { color: var(--muted); padding: .4rem .75rem; }
+.badge { background: #fef0c7; padding: .1rem .5rem; border-radius: 4px; font-size: .85rem; }
+ul.finished { opacity: .8; }
+
+/* TV display: big type, high contrast, readable from across a room */
+body.tv { background: #0b2e22; color: #fff; }
+body.tv main { max-width: none; margin: 0; padding: 2rem 3rem; }
+body.tv h1 { font-size: 2.2rem; margin: 0; }
+body.tv h2 { font-size: 1.6rem; color: #9be0c2; margin-bottom: .3rem; }
+.notice { font-size: 1.8rem; color: #fedf89; min-height: 2.2rem; }
+.serving-list, .next-list { list-style: none; padding: 0; margin: 0; }
+.serving-list li { display: flex; gap: 2rem; align-items: baseline; }
+.big-code { font-size: 9rem; font-weight: 800; line-height: 1.1; }
+.serving-list .room { font-size: 3rem; color: #9be0c2; }
+.next-list { display: flex; gap: 2rem; flex-wrap: wrap; font-size: 3.5rem; font-weight: 700; }
+.waiting { font-size: 2rem; }
+
+/* poster print view */
+body.poster main { max-width: 42rem; text-align: center; }
+body.poster h1 { font-size: 3rem; margin-bottom: 0; }
+body.poster .lead { font-size: 1.5rem; }
+.join-url { font-size: 1.6rem; font-weight: 700; word-break: break-all; border: 3px dashed var(--accent); padding: 1.5rem; }
+@media print { .no-print, .topbar { display: none !important; } body { background: #fff; } }

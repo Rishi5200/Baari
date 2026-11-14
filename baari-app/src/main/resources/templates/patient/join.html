@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{layout :: head(#{join.title})}"></head>
+<body class="patient">
+<main class="narrow">
+  <p class="langs">
+    <a th:href="@{/j/{c}/{q}(c=${clinicSlug},q=${queueSlug},lang='en')}" th:text="#{lang.en}">English</a> ·
+    <a th:href="@{/j/{c}/{q}(c=${clinicSlug},q=${queueSlug},lang='hi')}" th:text="#{lang.hi}">Hindi</a>
+  </p>
+
+  <h1 th:text="${queue.clinicName()}">Clinic</h1>
+  <h2 class="sub" th:text="${queue.queueName()}">Queue</h2>
+  <p class="muted" th:unless="${#lists.isEmpty(queue.doctors())}">
+    <span th:text="#{join.doctors}">Doctors</span>:
+    <span th:each="d, it : ${queue.doctors()}" th:text="${d} + (${it.last} ? '' : ', ')">Dr. Name</span>
+  </p>
+
+  <p class="alert" th:if="${queue.status() == null}" th:text="#{join.notOpen}">Not open.</p>
+  <p class="alert" th:if="${queue.status() != null and queue.status().name() == 'PAUSED'}" th:text="#{join.paused}">Paused.</p>
+  <p class="alert" th:if="${queue.status() != null and queue.status().name() == 'CLOSED'}" th:text="#{join.closed}">Closed.</p>
+
+  <p th:if="${canJoin}"><strong th:text="#{join.waiting}">Waiting now</strong>: <span th:text="${queue.waiting()}">3</span></p>
+
+  <p class="alert error" th:if="${formError}" th:text="${formError}">Error.</p>
+  <p class="alert error" th:if="${formErrorKey}" th:text="#{${formErrorKey}}">Error.</p>
+
+  <!--/* th:attr instead of th:action: th:action makes Spring Security add a CSRF field, which would
+       open a session for every patient. The join form is CSRF-exempt (no login to ride on). */-->
+  <form method="post" th:if="${canJoin}" th:attr="action=@{/j/{c}/{q}(c=${clinicSlug},q=${queueSlug})}">
+    <input type="hidden" name="idempotencyKey" th:value="${idempotencyKey}">
+    <label><span th:text="#{join.name}">Name</span>
+      <input name="name" maxlength="60" required autocomplete="name" th:value="${name}"></label>
+    <label><span th:text="#{join.phone}">Phone</span>
+      <input name="phone" type="tel" inputmode="tel" maxlength="30" autocomplete="tel" th:value="${phone}"></label>
+    <p class="muted small" th:text="#{join.phone.hint}">Hint</p>
+    <label><span th:text="#{join.visit}">Visit</span>
+      <select name="visitType">
+        <option value="NEW" th:selected="${visitType.name() == 'NEW'}" th:text="#{join.visit.NEW}">New</option>
+        <option value="FOLLOW_UP" th:selected="${visitType.name() == 'FOLLOW_UP'}" th:text="#{join.visit.FOLLOW_UP}">Follow-up</option>
+      </select></label>
+    <label class="check"><input type="checkbox" name="consent" required>
+      <span th:text="#{join.consent}">I agree</span></label>
+    <button type="submit" class="big" th:text="#{join.submit}">Get my token</button>
+  </form>
+</main>
+<script th:src="@{/js/join.js}" defer></script>
+</body>
+</html>

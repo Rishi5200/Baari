@@ -10,6 +10,7 @@ import java.util.List;
  * @param peopleAhead waiting patients who will be called first; null unless WAITING
  * @param nowServing display codes currently called or in consultation, latest first
  * @param queueStatus the token's queue day status (CLOSED → "Queue closed for today")
+ * @param room the room label of the doctor who called this token ("go to Room 2"); null if none
  */
 public record PublicTokenView(
         String displayCode,
@@ -18,7 +19,8 @@ public record PublicTokenView(
         Integer peopleAhead,
         List<String> nowServing,
         String queueName,
-        QueueDayStatus queueStatus) {
+        QueueDayStatus queueStatus,
+        String room) {
 
     public PublicTokenView {
         nowServing = List.copyOf(nowServing);

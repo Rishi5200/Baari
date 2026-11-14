@@ -16,6 +16,7 @@
   <nav th:if="${caller != null}">
     <a th:if="${caller.role().name() == 'PLATFORM_ADMIN'}" th:href="@{/platform/clinics}">Clinics</a>
     <th:block th:if="${caller.clinicId() != null}">
+      <a th:href="@{/staff/queues}">Console</a>
       <a th:href="@{/admin/doctors}">Doctors</a>
       <a th:href="@{/admin/queues}">Queues</a>
       <a th:if="${isClinicAdmin}" th:href="@{/admin/staff}">Staff</a>
@@ -28,6 +29,13 @@
     </form>
   </div>
 </header>
+
+<!--/* CSRF token for the console's fetch() calls. Only staff pages include this: on public pages
+     touching the token would create a session for every patient. */-->
+<th:block th:fragment="csrfMeta">
+  <meta name="csrf-token" th:content="${_csrf.token}">
+  <meta name="csrf-header" th:content="${_csrf.headerName}">
+</th:block>
 
 <th:block th:fragment="flash">
   <p class="alert" th:if="${flash}" th:text="${flash}">Saved.</p>

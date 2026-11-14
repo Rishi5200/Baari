@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{layout :: head(#{token.title})}"></head>
+<body class="patient">
+<main class="narrow" id="token"
+      th:attr="data-stream=@{/api/public/tokens/{c}/stream(c=${publicCode})},data-status=${view.status()}">
+  <p class="langs">
+    <a th:href="@{/t/{c}(c=${publicCode},lang='en')}" th:text="#{lang.en}">English</a> ·
+    <a th:href="@{/t/{c}(c=${publicCode},lang='hi')}" th:text="#{lang.hi}">Hindi</a>
+  </p>
+
+  <p class="conn" id="conn" hidden th:text="#{token.offline}">Connection lost.</p>
+
+  <h1 class="muted-title" th:text="${view.queueName()}">Queue</h1>
+  <p class="code" id="code" th:text="${view.displayCode()}">A-017</p>
+  <p class="status" id="status" th:text="#{'token.status.' + ${view.status()}}">Waiting</p>
+
+  <p class="ahead" id="ahead"
+     th:text="${view.status().name() != 'WAITING'} ? '' : (${view.peopleAhead() == 0} ? #{token.next} : #{token.ahead(${view.peopleAhead()})})">Ahead of you: 3</p>
+
+  <p class="alert" id="closed" th:hidden="${view.queueStatus().name() != 'CLOSED'}" th:text="#{token.closed}">Closed.</p>
+  <p class="alert" id="paused" th:hidden="${view.queueStatus().name() != 'PAUSED'}" th:text="#{token.paused}">Paused.</p>
+
+  <section>
+    <h3 th:text="#{token.nowServing}">Now serving</h3>
+    <p id="serving" class="serving"
+       th:text="${#lists.isEmpty(view.nowServing())} ? #{token.nobody} : ${#strings.listJoin(view.nowServing(), ', ')}">A-012</p>
+  </section>
+
+  <form method="post" id="cancel-form" th:attr="action=@{/t/{c}/cancel(c=${publicCode})}"
+        th:hidden="${view.status().name() != 'WAITING' and view.status().name() != 'CALLED'}">
+    <button type="submit" class="secondary" id="cancel" th:text="#{token.cancel}">Cancel my token</button>
+  </form>
+</main>
+
+<!--/* Full-screen "your turn" notice; JS shows it when the status becomes CALLED. */-->
+<div id="called" class="called" role="alertdialog" aria-live="assertive"
+     th:hidden="${view.status().name() != 'CALLED'}">
+  <h1 th:text="#{token.called.title}">It is your turn</h1>
+  <p class="code" th:text="${view.displayCode()}" id="called-code">A-017</p>
+  <p class="room" id="room"
+     th:text="${view.room() != null} ? #{token.called.room(${view.room()})} : #{token.called.noRoom}">Please go to Room 2</p>
+</div>
+
+<script th:inline="javascript">
+  window.BAARI_T = {
+    status: {
+      WAITING: /*[[#{token.status.WAITING}]]*/ 'Waiting',
+      CALLED: /*[[#{token.status.CALLED}]]*/ 'It is your turn',
+      IN_CONSULTATION: /*[[#{token.status.IN_CONSULTATION}]]*/ 'With the doctor',
+      COMPLETED: /*[[#{token.status.COMPLETED}]]*/ 'Finished',
+      NO_SHOW: /*[[#{token.status.NO_SHOW}]]*/ 'Absent',
+      CANCELLED: /*[[#{token.status.CANCELLED}]]*/ 'Cancelled',
+      EXPIRED: /*[[#{token.status.EXPIRED}]]*/ 'Closed'
+    },
+    next: /*[[#{token.next}]]*/ 'You are next',
+    ahead: /*[[#{token.ahead('{0}')}]]*/ 'Ahead of you: {0}',
+    nobody: /*[[#{token.nobody}]]*/ 'No one yet',
+    room: /*[[#{token.called.room('{0}')}]]*/ 'Please go to {0}',
+    noRoom: /*[[#{token.called.noRoom}]]*/ 'Please go in to see the doctor',
+    cancelConfirm: /*[[#{token.cancel.confirm}]]*/ 'Cancel your token?'
+  };
+</script>
+<script th:src="@{/js/baari.js}"></script>
+<script th:src="@{/js/token.js}" defer></script>
+</body>
+</html>

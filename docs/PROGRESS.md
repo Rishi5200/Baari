@@ -3,7 +3,28 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 2 — Queue core (in progress). Phase 1 complete, tagged `phase-1`.
+Phase 3 — UI & real-time (built, one manual check left). Phases 1 and 2 complete, tagged `phase-1`, `phase-2`.
+
+## Phase 3 plan (all built, 2026-11-14)
+1. [x] Live-update plumbing: `QueueChanged` event from `EventLog`, `realtime` module (`SseHub` with coalescing, heartbeat, cleanup, gauges; `RedisFanOut`; `StreamApi`), ADR 0008
+2. [x] Patient pages: join `/j/{clinic}/{queue}` (idempotency key, consent, no session), token `/t/{code}` (live, "your turn" overlay with vibration and sound, cancel)
+3. [x] Staff console `/staff/queues/{id}` (live board, call next, start/complete/no-show/recall/priority/cancel, walk-in, day controls, keyboard N and C)
+4. [x] TV display `/display/{queueId}?key=` (codes and room only) and poster print view `/admin/queues/{id}/poster`
+5. [x] English and Hindi (`messages*.properties`, `?lang=hi`, cookie)
+6. [x] Tests: `SseHubTest` (7), `StreamIT` (6, real HTTP and Redis), `LivePagesIT` (20)
+
+## Phase 3 "Done when"
+- [x] Patient page updates within 1 s of staff clicking "Call next": `StreamIT` asserts under 1000 ms (typically ~250 ms); real browsers measured about 470 ms click to update (2026-11-14)
+- [x] Cross-instance SSE test passes: `StreamIT.aMessageFromAnotherInstanceReachesThisInstancesStream` (publishes straight to Redis, as a second instance would)
+- [ ] Killing the network and reconnecting restores the correct state: **manual check, not done yet.** How: open a token page, turn off Wi-Fi or use DevTools "Offline" (banner "Connection lost" appears), call that token from the console, go back online; the page should show the new state within seconds (the stream sends a full snapshot on reconnect, and `online` / tab-visible events force a reconnect).
+- [x] TV display shows no patient names: `StreamIT.displayStreamNeedsTheKeyAndShowsNoNames`, `LivePagesIT.displayPageNeedsTheKeyAndShowsNoPatientNames`
+
+Phase 3 notes:
+- QR image is **not** built: the user declined adding ZXing, so the poster shows the join URL as text. The TV has no QR either (rotating QR is Phase 8).
+- htmx not used (needs a vendored script); vanilla `fetch()` instead, see ADR 0008.
+- Predicted start time per waiting patient and the typical wait are Phase 4 (ETA).
+- Telegram alerts button on the token page is Phase 5.
+- Console, token and TV JavaScript has no automated tests; checked by hand in a browser on the dev stack (login, open day, walk-in with `<b>` in the name rendered as text, call next, start, complete, live token page in Hindi).
 
 ## Phase 2 plan (7 tasks)
 1. [x] `TokenStateMachine` + every status × command test + JaCoCo 100% branch rule
@@ -41,7 +62,11 @@ Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; r
 - Parent POM (Java 21, Boot 4.1.2, Modulith 2.1.2, Spotless, JaCoCo, Surefire/Failsafe), modules `baari-app` + `baari-simulator`, wrapper
 - App skeleton, Flyway V1, test infra (`MutableClock`, `AbstractIntegrationTest`), compose stack, CI, ADR 0001. Tagged `phase-0`, CI green.
 
-## Verified locally (2026-11-14)
+## Verified locally (2026-11-14, after Phase 3)
+- `./mvnw verify`: BUILD SUCCESS. 191 unit tests (incl. `ModularityTest`), 186 integration tests, Spotless clean, JaCoCo rule met
+- Phase 2: full verify green and CI green on `7f8ab16`; tagged `phase-2`
+
+## Verified locally (2026-11-14, Phase 2)
 - `./mvnw verify`: BUILD SUCCESS. 32 unit tests, 55 integration tests, Modulith verify
 - Dev profile on the compose stack: seed runs once, seeded receptionist and clinic admin log in through the real form, session stored in Redis, admin pages render with seeded data
 
@@ -66,10 +91,11 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 **Full verify run (2026-11-14, after task 7):** BUILD SUCCESS. 184 unit tests (incl. `ModularityTest`), 160 integration tests, Spotless clean, JaCoCo rule met. **Before tagging `phase-2`:** push and check CI.
 
 ## In progress
-- Nothing. Phase 2 tasks are all built and the full verify is green; waiting on CI before tagging `phase-2`.
+- Nothing. Phase 3 is built and verified; waiting on CI and the offline/reconnect manual check.
 
 ## Next
-1. Phase 2 tasks 4–7 (see plan above)
+1. Run the reconnect check above, check CI, tag `phase-3`
+2. Phase 4: ETA v1 (per-doctor average, `QueueProjector`, ranges, hysteresis; fills the null ETA fields and the console's predicted start times)
 
 ## Open questions for the user
 - Nothing stops a clinic admin from disabling or demoting their own account (could leave a clinic with no admin). Add a guard?
@@ -153,6 +179,7 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
+- 2026-11-14 (Phase 3) — All Phase 3 tasks in one go: SSE hub with Redis fan-out and coalescing, patient join/token pages, staff console, TV display, poster print view, English and Hindi, ADR 0008, 33 new tests. Pushed. Next: reconnect manual check, CI, tag `phase-3`, then Phase 4.
 - 2026-11-14 (Phase 2) — Task 7: public and staff REST APIs, `QueueQueryService` (join page, token page, board), API security rules, journeys J1–J7 and an API security/error matrix (20 integration tests), ADRs 0003–0005. Unit tests not run (user's request). Next: full verify with unit tests, push, CI, tag `phase-2`.
 - 2026-11-14 (Phase 2) — Task 6: `TokenActionService` (call-next with day lock, override call, start, complete, no-show, recall, staff and patient cancel, priority), token events, 409 mapping for version conflicts, 34 integration tests incl. concurrency tests 4 and 5 ×5. Unit tests not run (user's request). Next: REST APIs + journeys + ADRs.
 - 2026-11-14 (Phase 2) — Task 5: `TokenService` join and walk-in (lock → checks → number), `QueueProperties`, display/public codes, `TokenJoined` event, 34 integration tests incl. concurrency tests 1, 2, 3, 6 ×5. Unit tests not run (user's request). Next: staff transitions.

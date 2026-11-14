@@ -38,8 +38,15 @@ class SecurityConfig {
                         // patients have no login; the public code in their link is the key
                         .requestMatchers("/api/public/**")
                         .permitAll()
+                        // patient pages (join, token) and the TV: the queue id, public code or display
+                        // key in the link is the credential; the services check it
+                        .requestMatchers("/j/**", "/t/**", "/display/**", "/api/display/**")
+                        .permitAll()
                         // queue work is for clinic staff; the platform admin runs no queues
                         .requestMatchers("/api/staff/**")
+                        .hasAnyRole("CLINIC_ADMIN", "DOCTOR", "RECEPTIONIST")
+                        // the queue console is for clinic staff
+                        .requestMatchers("/staff/**")
                         .hasAnyRole("CLINIC_ADMIN", "DOCTOR", "RECEPTIONIST")
                         // platform admin only
                         .requestMatchers("/platform/**")
@@ -53,8 +60,8 @@ class SecurityConfig {
                         .anyRequest()
                         .authenticated())
                 // CSRF protects requests a browser sends with the staff session cookie. The public
-                // API uses no session, so there is nothing for a forged request to ride on.
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/public/**"))
+                // API and the patient pages use no session, so there is nothing to ride on.
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/public/**", "/j/**", "/t/**"))
                 // Not logged in: API clients get a 401, pages redirect to the login page.
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(notLoggedIn()))
                 .formLogin(form -> form.loginPage("/login").defaultSuccessUrl("/", true))

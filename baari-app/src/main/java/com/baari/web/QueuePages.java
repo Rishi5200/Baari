@@ -3,10 +3,13 @@ package com.baari.web;
 import com.baari.clinic.CreatedQueue;
 import com.baari.clinic.DoctorAdminService;
 import com.baari.clinic.DoctorView;
+import com.baari.clinic.PublicQueue;
 import com.baari.clinic.QueueAdminService;
+import com.baari.clinic.QueueDirectory;
 import com.baari.clinic.StaffPrincipal;
 import com.baari.common.DuplicateException;
 import com.baari.common.InvalidRequestException;
+import com.baari.common.NotFoundException;
 import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.UUID;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** Queue list and forms. Rules live in {@link QueueAdminService}. */
 @Controller
@@ -28,10 +32,29 @@ class QueuePages {
 
     private final QueueAdminService queues;
     private final DoctorAdminService doctors;
+    private final QueueDirectory directory;
 
-    QueuePages(QueueAdminService queues, DoctorAdminService doctors) {
+    QueuePages(QueueAdminService queues, DoctorAdminService doctors, QueueDirectory directory) {
         this.queues = queues;
         this.doctors = doctors;
+        this.directory = directory;
+    }
+
+    /**
+     * Print view for the poster at the clinic door (PLAN section 12, Phase 3). Shows the join link
+     * as text: a QR image needs a QR library, which has not been added.
+     */
+    @GetMapping("/{id}/poster")
+    String poster(StaffPrincipal caller, @PathVariable UUID id, Model model) {
+        queues.get(caller, id); // clinic check
+        PublicQueue queue = directory.findPublic(id).orElseThrow(() -> new NotFoundException("Queue"));
+        String joinUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/j/{clinic}/{queue}")
+                .buildAndExpand(queue.clinicSlug(), queue.info().queue().slug())
+                .toUriString();
+        model.addAttribute("queue", queue);
+        model.addAttribute("joinUrl", joinUrl);
+        return "admin/poster";
     }
 
     @GetMapping

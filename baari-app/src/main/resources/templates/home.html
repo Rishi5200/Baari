@@ -8,12 +8,12 @@
   <ul class="links">
     <li th:if="${caller.role().name() == 'PLATFORM_ADMIN'}"><a th:href="@{/platform/clinics}">Clinics</a></li>
     <th:block th:if="${caller.clinicId() != null}">
+      <li><a th:href="@{/staff/queues}">Queue console</a></li>
       <li><a th:href="@{/admin/doctors}">Doctors</a></li>
       <li><a th:href="@{/admin/queues}">Queues</a></li>
       <li th:if="${isClinicAdmin}"><a th:href="@{/admin/staff}">Staff logins</a></li>
     </th:block>
   </ul>
-  <p class="muted">The reception console and the patient pages arrive in Phase 3.</p>
 </main>
 </body>
 </html>

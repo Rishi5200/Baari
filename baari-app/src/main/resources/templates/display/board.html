@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{layout :: head(#{display.title})}"></head>
+<body class="tv">
+<main id="board"
+      th:attr="data-stream=@{/api/display/queues/{id}/stream(id=${queueId},key=${key})}">
+  <p class="conn" id="conn" hidden th:text="#{display.offline}">Reconnecting...</p>
+  <h1 id="queue-name" th:text="${board.queueName()}">General OPD</h1>
+  <p class="notice" id="notice"></p>
+
+  <section class="now">
+    <h2 th:text="#{display.nowServing}">Now serving</h2>
+    <ul id="serving" class="serving-list">
+      <li th:each="s : ${board.nowServing()}">
+        <span class="big-code" th:text="${s.code()}">A-012</span>
+        <span class="room" th:if="${s.room() != null}" th:text="${s.room()}">Room 2</span>
+      </li>
+    </ul>
+  </section>
+
+  <section class="next">
+    <h2 th:text="#{display.next}">Next</h2>
+    <ul id="next" class="next-list">
+      <li th:each="c : ${board.next()}" th:text="${c}">A-013</li>
+    </ul>
+  </section>
+
+  <p class="waiting"><span th:text="#{display.waiting}">Waiting</span>: <strong id="waiting" th:text="${board.waiting()}">4</strong></p>
+</main>
+
+<script th:inline="javascript">
+  window.BAARI_T = {
+    notOpen: /*[[#{display.notOpen}]]*/ 'Not open yet',
+    paused: /*[[#{display.paused}]]*/ 'Paused',
+    closed: /*[[#{display.closed}]]*/ 'Closed',
+    nobody: /*[[#{display.nobody}]]*/ '-'
+  };
+</script>
+<script th:src="@{/js/baari.js}"></script>
+<script th:src="@{/js/display.js}" defer></script>
+</body>
+</html>
