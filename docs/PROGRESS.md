@@ -3,7 +3,7 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 1 — Clinics, staff & auth (**complete locally**, not yet pushed or tagged). Next: Phase 2.
+Phase 1 — Clinics, staff & auth (**complete**, tagged `phase-1`, CI green). Next: Phase 2.
 
 ## Phase 1 "Done when"
 - [x] Login/logout works; wrong password ×5 locks for 15 min: `StaffLoginIT` (MutableClock moves past the lock)
@@ -29,6 +29,10 @@ Phase 1 — Clinics, staff & auth (**complete locally**, not yet pushed or tagge
 - `./mvnw verify`: BUILD SUCCESS. 32 unit tests, 55 integration tests, Modulith verify
 - Dev profile on the compose stack: seed runs once, seeded receptionist and clinic admin log in through the real form, session stored in Redis, admin pages render with seeded data
 
+## CI
+- Phase 1, `951a318`: success. https://github.com/Rishi5200/Baari/actions/runs/43584766134
+- Phase 0, `f8f4c69`: success. https://github.com/Rishi5200/Baari/actions/runs/43581592618
+
 ## Bugs found and fixed while verifying
 - Boot 4 ignores the old property `spring.session.redis.namespace`; the right one is `spring.session.data.redis.namespace`. Sessions were silently using the default key prefix; the session test now checks the keys exist.
 
@@ -36,8 +40,7 @@ Phase 1 — Clinics, staff & auth (**complete locally**, not yet pushed or tagge
 - Nothing
 
 ## Next
-1. Push Phase 1 to GitHub, confirm CI is green, tag `phase-1`
-2. Phase 2 — Queue core (PLAN §12)
+1. Phase 2 — Queue core (PLAN §12)
 
 ## Open questions for the user
 - Nothing stops a clinic admin from disabling or demoting their own account (could leave a clinic with no admin). Add a guard?
@@ -61,6 +64,7 @@ Phase 1 — Clinics, staff & auth (**complete locally**, not yet pushed or tagge
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
+- 2026-11-14 (end) — Phase 1 pushed, CI green, tagged `phase-1`. Next: Phase 2.
 - 2026-11-14 (later) — Phase 1 built in 5 commits (schema, admin services, security, dev seed, admin pages); all Done-when items covered by tests. Next: push + CI + tag, then Phase 2.
 - 2026-11-14 — Pushed to github.com/Rishi5200/Baari; CI green. Phase 0 done, tagged `phase-0`. Next: Phase 1.
 - 2026-11-10 (later) — Docker fixed. Full verify with ITs green, dev profile healthy, Failsafe and line-ending bugs fixed. Next: remote + CI, then Phase 1.
