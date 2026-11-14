@@ -28,10 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.function.IntFunction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -171,35 +167,8 @@ class TokenServiceIT extends AbstractIntegrationTest {
         return oneTo(n).stream().map(Integer::longValue).toList();
     }
 
-    /** Result of one concurrent call: a value or the exception it threw. */
-    private record Outcome<T>(T value, Throwable error) {}
-
-    /**
-     * Starts {@code n} calls on virtual threads, releases them together through a start gate (so
-     * they really race), and waits for all of them.
-     */
-    private static <T> List<Outcome<T>> race(int n, IntFunction<Callable<T>> call) throws InterruptedException {
-        CountDownLatch start = new CountDownLatch(1);
-        List<Future<T>> futures = new ArrayList<>(n);
-        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (int i = 0; i < n; i++) {
-                Callable<T> task = call.apply(i);
-                futures.add(executor.submit(() -> {
-                    start.await();
-                    return task.call();
-                }));
-            }
-            start.countDown();
-        }
-        List<Outcome<T>> outcomes = new ArrayList<>(n);
-        for (Future<T> future : futures) {
-            try {
-                outcomes.add(new Outcome<>(future.get(), null));
-            } catch (ExecutionException e) {
-                outcomes.add(new Outcome<>(null, e.getCause()));
-            }
-        }
-        return outcomes;
+    private static <T> List<Race.Outcome<T>> race(int n, IntFunction<Callable<T>> call) throws InterruptedException {
+        return Race.run(n, call);
     }
 
     @Nested

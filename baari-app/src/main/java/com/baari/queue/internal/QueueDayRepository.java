@@ -22,4 +22,9 @@ public interface QueueDayRepository extends JpaRepository<QueueDayEntity, UUID> 
     @Query("select d from QueueDayEntity d where d.queueId = :queueId and d.serviceDate = :serviceDate")
     Optional<QueueDayEntity> lockByQueueIdAndServiceDate(
             @Param("queueId") UUID queueId, @Param("serviceDate") LocalDate serviceDate);
+
+    /** Same lock as above, for actions that start from a token rather than a queue. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select d from QueueDayEntity d where d.id = :id")
+    Optional<QueueDayEntity> lockById(@Param("id") UUID id);
 }

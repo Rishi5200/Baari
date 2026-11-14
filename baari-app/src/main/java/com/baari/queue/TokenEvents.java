@@ -23,4 +23,55 @@ public final class TokenEvents {
             VisitType visitType,
             TokenSource source)
             implements QueueEvent {}
+
+    /** @param override true when staff picked this patient out of order (not call-next) */
+    public record TokenCalled(
+            UUID eventId,
+            Instant occurredAt,
+            UUID clinicId,
+            UUID queueDayId,
+            long seq,
+            UUID tokenId,
+            UUID doctorId,
+            boolean override)
+            implements QueueEvent {}
+
+    /** @param directStart true when the patient went in without being called first */
+    public record ConsultStarted(
+            UUID eventId,
+            Instant occurredAt,
+            UUID clinicId,
+            UUID queueDayId,
+            long seq,
+            UUID tokenId,
+            UUID doctorId,
+            boolean directStart)
+            implements QueueEvent {}
+
+    public record ConsultCompleted(
+            UUID eventId, Instant occurredAt, UUID clinicId, UUID queueDayId, long seq, UUID tokenId, UUID doctorId)
+            implements QueueEvent {}
+
+    /** @param forced true when staff marked it before the grace period ended */
+    public record TokenNoShow(
+            UUID eventId, Instant occurredAt, UUID clinicId, UUID queueDayId, long seq, UUID tokenId, boolean forced)
+            implements QueueEvent {}
+
+    public record TokenRecalled(
+            UUID eventId, Instant occurredAt, UUID clinicId, UUID queueDayId, long seq, UUID tokenId, long sortKey)
+            implements QueueEvent {}
+
+    public record TokenCancelled(
+            UUID eventId,
+            Instant occurredAt,
+            UUID clinicId,
+            UUID queueDayId,
+            long seq,
+            UUID tokenId,
+            ActorType cancelledBy)
+            implements QueueEvent {}
+
+    public record TokenPriorityChanged(
+            UUID eventId, Instant occurredAt, UUID clinicId, UUID queueDayId, long seq, UUID tokenId, Priority priority)
+            implements QueueEvent {}
 }

@@ -11,7 +11,7 @@ Phase 2 — Queue core (in progress). Phase 1 complete, tagged `phase-1`.
 3. [x] `common.crypto`: phone normalisation, AES-GCM, HMAC hash, `Masking.phone()`, JPA converter, keys from config
 4. [x] V3 migration (queue_day, token, token_event, outbox_event) + `QueueDayService` (unit tests not run, see below)
 5. [x] `TokenService` join / walk-in + concurrency tests 1, 2, 3, 6 (unit tests not run, see below)
-6. [ ] Staff transitions (call-next row lock, start, complete, no-show, recall, cancel, priority) + tests 4, 5
+6. [x] Staff transitions (call-next row lock, start, complete, no-show, recall, cancel, priority) + tests 4, 5 (unit tests not run, see below)
 7. [ ] REST APIs (Appendix A) + journeys J1–J7 + ADRs 0003–0005
 
 Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; rate limits and rotating-QR checks stay in Phase 8; ETA fields null until Phase 4; doctors act only on queues they're assigned to; POOL call-next needs a doctor; crypto keys from env vars, fixed placeholders in dev/test; concurrency tests use `@RepeatedTest(5)`.
@@ -54,8 +54,10 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 - Task 4: integration tests 72/72 green, Spotless clean; unit tests, Modulith verify and JaCoCo check not run.
 - Task 5: integration tests 106/106 green (concurrency tests 1, 2, 3, 6 each passed 5×), Spotless clean; unit tests, Modulith verify and JaCoCo check not run. No new unit tests were written for `DisplayCode` / `PublicCodes` (covered through `TokenServiceIT` only).
 
+- Task 6: integration tests 140/140 green (concurrency tests 4 and 5 each passed 5×), Spotless clean; unit tests, Modulith verify and JaCoCo check not run. The new optimistic-lock handler in `ProblemDetailAdvice` has no unit test yet (`ProblemDetailAdviceTest` untouched).
+
 ## In progress
-- Phase 2, task 6: staff transitions (call-next row lock, start, complete, no-show, recall, cancel, priority) + tests 4, 5
+- Phase 2, task 7: REST APIs (Appendix A) + journeys J1–J7 + ADRs 0003–0005
 
 ## Next
 1. Phase 2 tasks 4–7 (see plan above)
@@ -117,9 +119,22 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
   - Display code `A-017`: prefix + number padded to 3 digits, longer above 999. Public code: 22 random base62 characters (`SecureRandom`).
   - 409 `already-in-queue` names only the other token's display code, never its public code.
   - `baari.queue.*` settings bound in `QueueProperties` with the PLAN §14 defaults.
+- Phase 2 token action choices (PLAN §4, §6.2, §6.3 leave these open):
+  - Every action locks the token's queue day, then loads the token (fresh, after the lock). The token's location is read first with a projection query so the entity isn't cached before the lock. Because actions on one day are serialized, a conflicting second action normally gets 409 `illegal-transition`; `@Version` conflicts map to 409 `concurrent-modification` as a safety net.
+  - Who is calling (call-next and override call): a DOCTOR always calls for themselves (naming another doctor → 400); reception/admin must name the doctor on a POOL queue (400 otherwise); a SINGLE queue defaults to its doctor. The doctor must be assigned to the queue (400).
+  - Call-next works while the day is PAUSED, not when CLOSED; nobody waiting → 409 `no-one-waiting`.
+  - Override call (`CallSpecific`) doesn't change the PRIORITY-in-a-row counter.
+  - Direct start (WAITING → IN_CONSULTATION) sets the doctor only when it's obvious: the caller's own doctor login, or a SINGLE queue's doctor; otherwise it stays empty.
+  - No-show before grace without force → 409 `grace-not-elapsed`.
+  - Recall clears `called_at` and the doctor, so the timestamps describe the call that led to the consultation. Recall on a later day → 409 `illegal-transition`.
+  - Patient cancel uses the public code (unknown → 404); cancelling again → 409.
+  - Setting the priority a waiting token already has is a no-op (no event).
+  - Staff token view includes name and last 4 phone digits, never the full number or the public code.
+  - Concurrency test 5: PLAN's "complete vs no-show" can't race (no status allows both), so the test races start vs forced no-show on a CALLED token, plus a double-clicked complete.
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
+- 2026-11-14 (Phase 2) — Task 6: `TokenActionService` (call-next with day lock, override call, start, complete, no-show, recall, staff and patient cancel, priority), token events, 409 mapping for version conflicts, 34 integration tests incl. concurrency tests 4 and 5 ×5. Unit tests not run (user's request). Next: REST APIs + journeys + ADRs.
 - 2026-11-14 (Phase 2) — Task 5: `TokenService` join and walk-in (lock → checks → number), `QueueProperties`, display/public codes, `TokenJoined` event, 34 integration tests incl. concurrency tests 1, 2, 3, 6 ×5. Unit tests not run (user's request). Next: staff transitions.
 - 2026-11-14 (Phase 2) — Task 4: V3 migration, `QueueDayService` (open/pause/resume/close), `EventLog` (token_event + outbox), Token/QueueDay entities, 17 integration tests. Unit tests not run (user's request). Next: `TokenService` join / walk-in.
 - 2026-11-14 (Phase 2) — Task 3: `common.crypto` (PhoneNumber, Masking, FieldCipher AES-256-GCM, PhoneHasher HMAC-SHA256, EncryptedStringConverter, startup key checks), 48 unit tests. Next: V3 migration + `QueueDayService`.

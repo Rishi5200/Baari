@@ -75,6 +75,14 @@ public class QueueDayEntity extends AssignedIdEntity {
         return consecutivePriorityServed;
     }
 
+    /** Stores the policy state after a real call-next (PLAN §5). */
+    public void recordPolicyState(int consecutivePriorityServed) {
+        if (consecutivePriorityServed < 0) {
+            throw new IllegalArgumentException("consecutivePriorityServed must be >= 0");
+        }
+        this.consecutivePriorityServed = consecutivePriorityServed;
+    }
+
     /**
      * Takes the next token number. The caller holds the row lock, so numbers are unique and
      * gap-free: if the issuing transaction rolls back, the increment rolls back with it (ADR 0003).

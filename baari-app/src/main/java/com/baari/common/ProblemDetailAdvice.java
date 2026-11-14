@@ -5,6 +5,7 @@ import java.net.URI;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -41,6 +42,18 @@ class ProblemDetailAdvice extends ResponseEntityExceptionHandler {
                 .collect(Collectors.joining("; "));
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
         problem.setType(URI.create(TYPE_BASE + "validation"));
+        return problem;
+    }
+
+    /**
+     * A {@code @Version} conflict: someone else changed the same row first (a double-click, or two
+     * staff acting on one token). The client should reload and try again (PLAN §6.3).
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ProblemDetail handleOptimisticLock(OptimisticLockingFailureException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, "Someone else changed this at the same time. Reload and try again.");
+        problem.setType(URI.create(TYPE_BASE + "concurrent-modification"));
         return problem;
     }
 

@@ -13,7 +13,14 @@ public sealed interface QueueEvent
                 QueueDayEvents.QueueDayPaused,
                 QueueDayEvents.QueueDayResumed,
                 QueueDayEvents.QueueDayClosed,
-                TokenEvents.TokenJoined {
+                TokenEvents.TokenJoined,
+                TokenEvents.TokenCalled,
+                TokenEvents.ConsultStarted,
+                TokenEvents.ConsultCompleted,
+                TokenEvents.TokenNoShow,
+                TokenEvents.TokenRecalled,
+                TokenEvents.TokenCancelled,
+                TokenEvents.TokenPriorityChanged {
 
     UUID eventId();
 

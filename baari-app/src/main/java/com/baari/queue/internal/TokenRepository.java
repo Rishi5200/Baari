@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface TokenRepository extends JpaRepository<TokenEntity, UUID> {
 
@@ -18,4 +20,18 @@ public interface TokenRepository extends JpaRepository<TokenEntity, UUID> {
             UUID queueDayId, byte[] phoneHash, Collection<TokenStatus> statuses);
 
     long countByQueueDayIdAndStatusIn(UUID queueDayId, Collection<TokenStatus> statuses);
+
+    @Query("""
+            select new com.baari.queue.internal.TokenRef(t.id, t.queueDayId, d.queueId, t.clinicId)
+              from TokenEntity t, QueueDayEntity d
+             where t.id = :id and d.id = t.queueDayId
+            """)
+    Optional<TokenRef> findRefById(@Param("id") UUID id);
+
+    @Query("""
+            select new com.baari.queue.internal.TokenRef(t.id, t.queueDayId, d.queueId, t.clinicId)
+              from TokenEntity t, QueueDayEntity d
+             where t.publicCode = :publicCode and d.id = t.queueDayId
+            """)
+    Optional<TokenRef> findRefByPublicCode(@Param("publicCode") String publicCode);
 }
