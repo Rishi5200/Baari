@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<!--/* Shared fragments. Pages include them with th:replace="~{layout :: name}". */-->
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head th:fragment="head(title)">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title th:text="${title} + ' · Baari'">Baari</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+
+<body>
+
+<header th:fragment="topbar" class="topbar">
+  <a class="brand" th:href="@{/}">Baari</a>
+  <nav th:if="${caller != null}">
+    <a th:if="${caller.role().name() == 'PLATFORM_ADMIN'}" th:href="@{/platform/clinics}">Clinics</a>
+    <th:block th:if="${caller.clinicId() != null}">
+      <a th:href="@{/admin/doctors}">Doctors</a>
+      <a th:href="@{/admin/queues}">Queues</a>
+      <a th:if="${isClinicAdmin}" th:href="@{/admin/staff}">Staff</a>
+    </th:block>
+  </nav>
+  <div class="who" th:if="${caller != null}">
+    <span th:text="${caller.username()} + ' · ' + ${caller.role()}">user · ROLE</span>
+    <form method="post" th:action="@{/logout}" class="inline">
+      <button type="submit" class="link">Log out</button>
+    </form>
+  </div>
+</header>
+
+<th:block th:fragment="flash">
+  <p class="alert" th:if="${flash}" th:text="${flash}">Saved.</p>
+  <p class="alert error" th:if="${flashError}" th:text="${flashError}">Error.</p>
+  <p class="alert error" th:if="${formError}" th:text="${formError}">Error.</p>
+</th:block>
+
+<small th:fragment="fieldError(field)" class="field-error"
+       th:if="${errors != null and errors.containsKey(field)}" th:text="${errors.get(field)}">error</small>
+
+</body>
+</html>

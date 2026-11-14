@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Clinics')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main>
+  <div class="page-head">
+    <h1>Clinics</h1>
+    <a class="button" th:href="@{/platform/clinics/new}">Add clinic</a>
+  </div>
+  <th:block th:replace="~{layout :: flash}"></th:block>
+
+  <p th:if="${#lists.isEmpty(clinics)}" class="muted">No clinics yet.</p>
+  <table th:unless="${#lists.isEmpty(clinics)}">
+    <thead><tr><th>Slug</th><th>Name</th><th>Time zone</th></tr></thead>
+    <tbody>
+    <tr th:each="c : ${clinics}">
+      <td><code th:text="${c.slug()}">sharma-clinic</code></td>
+      <td th:text="${c.name()}">Sharma Clinic</td>
+      <td th:text="${c.timezone()}">Asia/Kolkata</td>
+    </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

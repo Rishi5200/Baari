@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Add login')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main class="narrow">
+  <h1>Add staff login</h1>
+  <th:block th:replace="~{layout :: flash}"></th:block>
+
+  <form method="post" th:action="@{/admin/staff}">
+    <label>Username (lowercase letters, digits, . _ -)
+      <input type="text" name="username" th:value="${form.username()}" required
+             pattern="[a-z0-9._\-]{3,40}" autocomplete="off">
+      <small th:replace="~{layout :: fieldError('username')}"></small>
+    </label>
+    <label>Password (8–72 characters)
+      <input type="password" name="password" required minlength="8" maxlength="72" autocomplete="new-password">
+      <small th:replace="~{layout :: fieldError('password')}"></small>
+    </label>
+    <label>Role
+      <select name="role">
+        <option th:each="r : ${clinicRoles}" th:value="${r}" th:text="${r}"
+                th:selected="${r == form.role()}">RECEPTIONIST</option>
+      </select>
+      <small th:replace="~{layout :: fieldError('role')}"></small>
+    </label>
+    <label>Doctor (only for the DOCTOR role)
+      <select name="doctorId">
+        <option value="">—</option>
+        <option th:each="d : ${doctors}" th:value="${d.id()}" th:text="${d.name()}"
+                th:selected="${d.id() == form.doctorId()}">Dr. Name</option>
+      </select>
+      <small th:replace="~{layout :: fieldError('doctorId')}"></small>
+    </label>
+    <button type="submit">Create login</button>
+    <a th:href="@{/admin/staff}">Cancel</a>
+  </form>
+</main>
+</body>
+</html>

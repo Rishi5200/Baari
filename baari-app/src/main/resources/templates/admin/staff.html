@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Staff logins')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main>
+  <div class="page-head">
+    <h1>Staff logins</h1>
+    <a class="button" th:href="@{/admin/staff/new}">Add login</a>
+  </div>
+  <th:block th:replace="~{layout :: flash}"></th:block>
+
+  <table>
+    <thead><tr><th>Username</th><th>Role</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <tr th:each="u : ${users}" th:classappend="${u.enabled()} ? '' : 'inactive'">
+      <td th:text="${u.username()}">ravi</td>
+      <td th:text="${u.role()}">RECEPTIONIST</td>
+      <td th:text="${u.enabled()} ? 'Enabled' : 'Disabled'">Enabled</td>
+      <td class="actions"><a th:href="@{/admin/staff/{id}(id=${u.id()})}">Manage</a></td>
+    </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

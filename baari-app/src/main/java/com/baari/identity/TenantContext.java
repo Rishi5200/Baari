@@ -2,6 +2,7 @@ package com.baari.identity;
 
 import com.baari.clinic.StaffPrincipal;
 import com.baari.identity.internal.StaffUserDetails;
+import java.util.Optional;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,11 +19,16 @@ import org.springframework.stereotype.Component;
 public class TenantContext {
 
     public StaffPrincipal current() {
+        // Only throws if an endpoint that asks for a StaffPrincipal is wrongly left public.
+        return find().orElseThrow(() -> new AuthenticationCredentialsNotFoundException("No staff user is logged in"));
+    }
+
+    /** Empty on public pages (login, error), where nobody may be logged in. */
+    public Optional<StaffPrincipal> find() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof StaffUserDetails details) {
-            return details.principal();
+            return Optional.of(details.principal());
         }
-        // Only reachable if an endpoint that asks for a StaffPrincipal is wrongly left public.
-        throw new AuthenticationCredentialsNotFoundException("No staff user is logged in");
+        return Optional.empty();
     }
 }

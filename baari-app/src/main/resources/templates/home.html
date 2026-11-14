@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Baari</title>
-  <link rel="stylesheet" th:href="@{/css/app.css}">
-</head>
+<head th:replace="~{layout :: head('Home')}"></head>
 <body>
-<main class="narrow">
-  <h1>Baari</h1>
-  <p>Logged in as <strong th:text="${caller.username()}">user</strong>
-    (<span th:text="${caller.role()}">ROLE</span>).</p>
-  <form method="post" th:action="@{/logout}">
-    <button type="submit">Log out</button>
-  </form>
+<header th:replace="~{layout :: topbar}"></header>
+<main>
+  <h1>Welcome, <span th:text="${caller.username()}">user</span></h1>
+  <ul class="links">
+    <li th:if="${caller.role().name() == 'PLATFORM_ADMIN'}"><a th:href="@{/platform/clinics}">Clinics</a></li>
+    <th:block th:if="${caller.clinicId() != null}">
+      <li><a th:href="@{/admin/doctors}">Doctors</a></li>
+      <li><a th:href="@{/admin/queues}">Queues</a></li>
+      <li th:if="${isClinicAdmin}"><a th:href="@{/admin/staff}">Staff logins</a></li>
+    </th:block>
+  </ul>
+  <p class="muted">The reception console and the patient pages arrive in Phase 3.</p>
 </main>
 </body>
 </html>

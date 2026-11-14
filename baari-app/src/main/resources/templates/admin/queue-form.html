@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head(${queueId == null} ? 'Add queue' : 'Edit queue')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main class="narrow">
+  <h1 th:text="${queueId == null} ? 'Add queue' : 'Edit queue'">Add queue</h1>
+  <th:block th:replace="~{layout :: flash}"></th:block>
+
+  <form method="post"
+        th:action="${queueId == null} ? @{/admin/queues} : @{/admin/queues/{id}(id=${queueId})}">
+    <label th:if="${queueId == null}">Slug (used in the QR link; cannot be changed later)
+      <input type="text" name="slug" th:value="${form.slug()}" required maxlength="60"
+             pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="general">
+      <small th:replace="~{layout :: fieldError('slug')}"></small>
+    </label>
+    <p th:unless="${queueId == null}">Slug: <code th:text="${form.slug()}">general</code></p>
+
+    <label>Name
+      <input type="text" name="name" th:value="${form.name()}" required maxlength="120">
+      <small th:replace="~{layout :: fieldError('name')}"></small>
+    </label>
+
+    <label>Mode
+      <select name="mode">
+        <option th:each="m : ${queueModes}" th:value="${m}" th:text="${m}"
+                th:selected="${m == form.mode()}">POOL</option>
+      </select>
+      <small class="muted">SINGLE: one doctor. POOL: any assigned doctor takes the next patient.</small>
+      <small th:replace="~{layout :: fieldError('mode')}"></small>
+    </label>
+
+    <label>QR code
+      <select name="qrMode">
+        <option th:each="m : ${qrModes}" th:value="${m}" th:text="${m}"
+                th:selected="${m == form.qrMode()}">STATIC</option>
+      </select>
+      <small th:replace="~{layout :: fieldError('qrMode')}"></small>
+    </label>
+
+    <label>Token prefix (1–3 capital letters, e.g. A for A-017)
+      <input type="text" name="displayCodePrefix" th:value="${form.displayCodePrefix()}" required
+             maxlength="3" pattern="[A-Z]{1,3}">
+      <small th:replace="~{layout :: fieldError('displayCodePrefix')}"></small>
+    </label>
+
+    <fieldset>
+      <legend>Doctors</legend>
+      <p th:if="${#lists.isEmpty(doctors)}" class="muted">Add doctors first.</p>
+      <label class="check" th:each="d : ${doctors}">
+        <input type="checkbox" name="doctorIds" th:value="${d.id()}" th:checked="${form.hasDoctor(d.id())}">
+        <span th:text="${d.name()}">Dr. Name</span>
+      </label>
+    </fieldset>
+
+    <button type="submit">Save</button>
+    <a th:href="@{/admin/queues}">Cancel</a>
+  </form>
+</main>
+</body>
+</html>

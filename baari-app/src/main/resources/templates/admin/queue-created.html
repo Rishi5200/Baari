@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Queue created')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main class="narrow">
+  <h1>Queue created</h1>
+  <p>Queue <code th:text="${created.queue().slug()}">general</code> is ready.</p>
+
+  <div class="alert">
+    <p><strong>TV display key</strong> (shown only once, copy it now):</p>
+    <p><code class="secret" th:text="${created.displayKey()}">key</code></p>
+    <p class="muted">The waiting-room TV uses this key to show the queue. Only a hash is stored,
+      so it can't be shown again.</p>
+  </div>
+
+  <p><a th:href="@{/admin/queues}">Back to queues</a></p>
+</main>
+</body>
+</html>

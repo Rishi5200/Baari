@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Queues')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main>
+  <div class="page-head">
+    <h1>Queues</h1>
+    <a th:if="${isClinicAdmin}" class="button" th:href="@{/admin/queues/new}">Add queue</a>
+  </div>
+  <th:block th:replace="~{layout :: flash}"></th:block>
+
+  <p th:if="${#lists.isEmpty(queues)}" class="muted">No queues yet.</p>
+  <table th:unless="${#lists.isEmpty(queues)}">
+    <thead><tr><th>Slug</th><th>Name</th><th>Mode</th><th>QR</th><th>Prefix</th><th>Doctors</th>
+      <th th:if="${isClinicAdmin}"></th></tr></thead>
+    <tbody>
+    <tr th:each="q : ${queues}">
+      <td><code th:text="${q.slug()}">general</code></td>
+      <td th:text="${q.name()}">General OPD</td>
+      <td th:text="${q.mode()}">POOL</td>
+      <td th:text="${q.qrMode()}">STATIC</td>
+      <td th:text="${q.displayCodePrefix()}">A</td>
+      <td>
+        <span th:each="id, it : ${q.doctorIds()}"
+              th:text="${doctorNames.get(id)} + (${it.last} ? '' : ', ')">Dr. Name</span>
+        <span th:if="${#sets.isEmpty(q.doctorIds())}" class="muted">none</span>
+      </td>
+      <td th:if="${isClinicAdmin}" class="actions">
+        <a th:href="@{/admin/queues/{id}/edit(id=${q.id()})}">Edit</a>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

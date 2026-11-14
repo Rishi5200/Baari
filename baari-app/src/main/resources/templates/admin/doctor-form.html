@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head(${doctorId == null} ? 'Add doctor' : 'Edit doctor')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main class="narrow">
+  <h1 th:text="${doctorId == null} ? 'Add doctor' : 'Edit doctor'">Add doctor</h1>
+  <th:block th:replace="~{layout :: flash}"></th:block>
+
+  <form method="post"
+        th:action="${doctorId == null} ? @{/admin/doctors} : @{/admin/doctors/{id}(id=${doctorId})}">
+    <label>Name
+      <input type="text" name="name" th:value="${form.name()}" required maxlength="120">
+      <small th:replace="~{layout :: fieldError('name')}"></small>
+    </label>
+    <label>Room (optional)
+      <input type="text" name="roomLabel" th:value="${form.roomLabel()}" maxlength="40">
+      <small th:replace="~{layout :: fieldError('roomLabel')}"></small>
+    </label>
+    <button type="submit">Save</button>
+    <a th:href="@{/admin/doctors}">Cancel</a>
+  </form>
+</main>
+</body>
+</html>

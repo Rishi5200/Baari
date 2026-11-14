@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Add clinic')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main class="narrow">
+  <h1>Add clinic</h1>
+  <th:block th:replace="~{layout :: flash}"></th:block>
+
+  <form method="post" th:action="@{/platform/clinics}">
+    <label>Slug (used in links)
+      <input type="text" name="slug" th:value="${form.slug()}" required maxlength="60"
+             pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="sharma-clinic">
+      <small th:replace="~{layout :: fieldError('slug')}"></small>
+    </label>
+    <label>Name
+      <input type="text" name="name" th:value="${form.name()}" required maxlength="120">
+      <small th:replace="~{layout :: fieldError('name')}"></small>
+    </label>
+    <label>Time zone
+      <input type="text" name="timezone" th:value="${form.timezone()}" required>
+      <small th:replace="~{layout :: fieldError('timezone')}"></small>
+    </label>
+
+    <fieldset>
+      <legend>First clinic admin login</legend>
+      <label>Username
+        <input type="text" name="adminUsername" th:value="${form.adminUsername()}" required
+               pattern="[a-z0-9._\-]{3,40}" autocomplete="off">
+        <small th:replace="~{layout :: fieldError('adminUsername')}"></small>
+      </label>
+      <label>Password (8–72 characters)
+        <input type="password" name="adminPassword" required minlength="8" maxlength="72"
+               autocomplete="new-password">
+        <small th:replace="~{layout :: fieldError('adminPassword')}"></small>
+      </label>
+    </fieldset>
+
+    <button type="submit">Create clinic</button>
+    <a th:href="@{/platform/clinics}">Cancel</a>
+  </form>
+</main>
+</body>
+</html>

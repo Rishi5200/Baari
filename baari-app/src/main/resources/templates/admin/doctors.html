@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Doctors')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main>
+  <div class="page-head">
+    <h1>Doctors</h1>
+    <a th:if="${isClinicAdmin}" class="button" th:href="@{/admin/doctors/new}">Add doctor</a>
+  </div>
+  <th:block th:replace="~{layout :: flash}"></th:block>
+
+  <p th:if="${#lists.isEmpty(doctors)}" class="muted">No doctors yet.</p>
+  <table th:unless="${#lists.isEmpty(doctors)}">
+    <thead><tr><th>Name</th><th>Room</th><th>Status</th><th th:if="${isClinicAdmin}"></th></tr></thead>
+    <tbody>
+    <tr th:each="d : ${doctors}" th:classappend="${d.active()} ? '' : 'inactive'">
+      <td th:text="${d.name()}">Dr. Name</td>
+      <td th:text="${d.roomLabel()}">Room 1</td>
+      <td th:text="${d.active()} ? 'Active' : 'Inactive'">Active</td>
+      <td th:if="${isClinicAdmin}" class="actions">
+        <a th:href="@{/admin/doctors/{id}/edit(id=${d.id()})}">Edit</a>
+        <form method="post" th:action="@{/admin/doctors/{id}/active(id=${d.id()})}" class="inline">
+          <input type="hidden" name="active" th:value="${!d.active()}">
+          <button type="submit" class="link" th:text="${d.active()} ? 'Deactivate' : 'Activate'">Deactivate</button>
+        </form>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>
