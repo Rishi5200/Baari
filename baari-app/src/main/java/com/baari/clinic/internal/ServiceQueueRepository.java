@@ -13,4 +13,6 @@ public interface ServiceQueueRepository extends JpaRepository<ServiceQueueEntity
     List<ServiceQueueEntity> findAllByClinicIdOrderBySlug(UUID clinicId);
 
     boolean existsByClinicIdAndSlug(UUID clinicId, String slug);
+
+    Optional<ServiceQueueEntity> findByClinicIdAndSlug(UUID clinicId, String slug);
 }

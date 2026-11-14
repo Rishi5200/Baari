@@ -1,7 +1,10 @@
 package com.baari.clinic;
 
 import com.baari.clinic.internal.ClinicRepository;
+import com.baari.clinic.internal.DoctorEntity;
+import com.baari.clinic.internal.DoctorRepository;
 import com.baari.clinic.internal.ServiceQueueRepository;
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -17,10 +20,12 @@ public class QueueDirectory {
 
     private final ServiceQueueRepository queues;
     private final ClinicRepository clinics;
+    private final DoctorRepository doctors;
 
-    QueueDirectory(ServiceQueueRepository queues, ClinicRepository clinics) {
+    QueueDirectory(ServiceQueueRepository queues, ClinicRepository clinics, DoctorRepository doctors) {
         this.queues = queues;
         this.clinics = clinics;
+        this.doctors = doctors;
     }
 
     @Transactional(readOnly = true)
@@ -29,5 +34,20 @@ public class QueueDirectory {
                 .flatMap(queue -> clinics.findById(queue.getClinicId())
                         .map(clinic ->
                                 new QueueInfo(queue.toView(), clinic.toView().timezone())));
+    }
+
+    /** The queue behind a join link {@code /j/{clinicSlug}/{queueSlug}}, with its active doctors. */
+    @Transactional(readOnly = true)
+    public Optional<PublicQueue> findBySlugs(String clinicSlug, String queueSlug) {
+        return clinics.findBySlug(clinicSlug)
+                .flatMap(clinic -> queues.findByClinicIdAndSlug(clinic.getId(), queueSlug)
+                        .map(queue -> new PublicQueue(
+                                new QueueInfo(queue.toView(), clinic.toView().timezone()),
+                                clinic.toView().name(),
+                                doctors.findAllById(queue.getDoctorIds()).stream()
+                                        .map(DoctorEntity::toView)
+                                        .filter(DoctorView::active)
+                                        .sorted(Comparator.comparing(DoctorView::name))
+                                        .toList())));
     }
 }

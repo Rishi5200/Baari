@@ -3,8 +3,14 @@ package com.baari.identity;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 
 /**
  * Staff authentication (PLAN §9.1): form login, server-side sessions in Redis (Spring Session),
@@ -29,6 +35,12 @@ class SecurityConfig {
                         // Prometheus scrapes without credentials; locked down in Phase 8 hardening.
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus")
                         .permitAll()
+                        // patients have no login; the public code in their link is the key
+                        .requestMatchers("/api/public/**")
+                        .permitAll()
+                        // queue work is for clinic staff; the platform admin runs no queues
+                        .requestMatchers("/api/staff/**")
+                        .hasAnyRole("CLINIC_ADMIN", "DOCTOR", "RECEPTIONIST")
                         // platform admin only
                         .requestMatchers("/platform/**")
                         .hasRole("PLATFORM_ADMIN")
@@ -40,8 +52,21 @@ class SecurityConfig {
                         .hasRole("CLINIC_ADMIN")
                         .anyRequest()
                         .authenticated())
+                // CSRF protects requests a browser sends with the staff session cookie. The public
+                // API uses no session, so there is nothing for a forged request to ride on.
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/public/**"))
+                // Not logged in: API clients get a 401, pages redirect to the login page.
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(notLoggedIn()))
                 .formLogin(form -> form.loginPage("/login").defaultSuccessUrl("/", true))
                 .logout(logout -> logout.logoutSuccessUrl("/login?logout"));
         return http.build();
+    }
+
+    private static AuthenticationEntryPoint notLoggedIn() {
+        RequestMatcher api = PathPatternRequestMatcher.withDefaults().matcher("/api/**");
+        AuthenticationEntryPoint unauthorized = new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED);
+        AuthenticationEntryPoint loginPage = new LoginUrlAuthenticationEntryPoint("/login");
+        return (request, response, exception) ->
+                (api.matches(request) ? unauthorized : loginPage).commence(request, response, exception);
     }
 }

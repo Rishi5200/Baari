@@ -19,6 +19,10 @@ public interface TokenRepository extends JpaRepository<TokenEntity, UUID> {
     Optional<TokenEntity> findFirstByQueueDayIdAndPhoneHashAndStatusIn(
             UUID queueDayId, byte[] phoneHash, Collection<TokenStatus> statuses);
 
+    Optional<TokenEntity> findByPublicCode(String publicCode);
+
+    List<TokenEntity> findByQueueDayIdOrderByNumberAsc(UUID queueDayId);
+
     long countByQueueDayIdAndStatusIn(UUID queueDayId, Collection<TokenStatus> statuses);
 
     @Query("""

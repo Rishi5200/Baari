@@ -12,7 +12,12 @@ Phase 2 — Queue core (in progress). Phase 1 complete, tagged `phase-1`.
 4. [x] V3 migration (queue_day, token, token_event, outbox_event) + `QueueDayService` (unit tests not run, see below)
 5. [x] `TokenService` join / walk-in + concurrency tests 1, 2, 3, 6 (unit tests not run, see below)
 6. [x] Staff transitions (call-next row lock, start, complete, no-show, recall, cancel, priority) + tests 4, 5 (unit tests not run, see below)
-7. [ ] REST APIs (Appendix A) + journeys J1–J7 + ADRs 0003–0005
+7. [x] REST APIs (Appendix A) + journeys J1–J7 + ADRs 0003–0005 (unit tests not run, see below)
+
+## Phase 2 "Done when" (not tagged yet)
+- [x] All six concurrency tests in §6.4 pass, repeated 5× (locally; not yet in CI): `TokenServiceIT` (1, 2, 3, 6), `TokenActionServiceIT` (4, 5)
+- [x] Journeys J1–J7 pass as API-level integration tests (ETA null; J1's "3 ahead" notification is Phase 5, J7's two-server projection is Phase 4): `JourneysIT`
+- [ ] State machine and policy have 100% branch coverage: **not checked since task 4**. Needs a full `./mvnw verify` with unit tests (the JaCoCo rule runs there). Expected to hold: those classes haven't changed since tasks 1–2, when the rule passed.
 
 Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; rate limits and rotating-QR checks stay in Phase 8; ETA fields null until Phase 4; doctors act only on queues they're assigned to; POOL call-next needs a doctor; crypto keys from env vars, fixed placeholders in dev/test; concurrency tests use `@RepeatedTest(5)`.
 
@@ -56,8 +61,12 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 
 - Task 6: integration tests 140/140 green (concurrency tests 4 and 5 each passed 5×), Spotless clean; unit tests, Modulith verify and JaCoCo check not run. The new optimistic-lock handler in `ProblemDetailAdvice` has no unit test yet (`ProblemDetailAdviceTest` untouched).
 
+- Task 7: integration tests 160/160 green, Spotless clean; unit tests, Modulith verify and JaCoCo check not run.
+
+**Before tagging `phase-2`:** run the full `./mvnw verify` (unit tests + `ModularityTest` + JaCoCo rule), push, and check CI.
+
 ## In progress
-- Phase 2, task 7: REST APIs (Appendix A) + journeys J1–J7 + ADRs 0003–0005
+- Nothing. Phase 2 tasks are all built; waiting on the full verify with unit tests, push and CI before tagging.
 
 ## Next
 1. Phase 2 tasks 4–7 (see plan above)
@@ -131,9 +140,20 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
   - Setting the priority a waiting token already has is a no-op (no event).
   - Staff token view includes name and last 4 phone digits, never the full number or the public code.
   - Concurrency test 5: PLAN's "complete vs no-show" can't race (no status allows both), so the test races start vs forced no-show on a CALLED token, plus a double-clicked complete.
+- Phase 2 REST API choices (Appendix A leaves these open):
+  - REST controllers live in `com.baari.queue.api` (not `web`), so `WebErrorAdvice` (HTML error pages for `com.baari.web`) doesn't catch their errors and they get RFC 9457 JSON from `ProblemDetailAdvice`.
+  - Security: `/api/public/**` open and CSRF-exempt (no session to forge); `/api/staff/**` needs CLINIC_ADMIN, DOCTOR or RECEPTIONIST (platform admin 403) plus CSRF. Not logged in: `/api/**` → 401, pages → redirect to `/login`.
+  - Join and walk-in: 201 when created, 200 when the idempotency key was used before. The key may come in the body or the `Idempotency-Key` header (body wins); join without either → 400.
+  - Join response: `{publicCode, displayCode, status, priority, position, eta: null}`. `qrWindow`/`qrSig` accepted and ignored until Phase 8.
+  - Public queue view (`GET /api/public/queues/{clinicSlug}/{queueSlug}`): queue id, clinic and queue names, active doctors' names, today's status (null = not opened), waiting count. Typical wait added in Phase 4.
+  - Public token view: display code, status, position and people ahead (WAITING only), now-serving codes (called or in consultation, latest first), queue name and today's status. No name, phone or ids.
+  - Patient cancel returns the token view; staff mutations return the staff token view; walk-in returns the issued token (with its public code, so reception can share the link); day actions return the day.
+  - Board: today's day (null if not opened) and tokens split into waiting (in call order), called, in consultation, no-show, finished.
+  - ADRs written: 0003 (counter row), 0004 (call-next row lock), 0005 (transactional outbox).
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
+- 2026-11-14 (Phase 2) — Task 7: public and staff REST APIs, `QueueQueryService` (join page, token page, board), API security rules, journeys J1–J7 and an API security/error matrix (20 integration tests), ADRs 0003–0005. Unit tests not run (user's request). Next: full verify with unit tests, push, CI, tag `phase-2`.
 - 2026-11-14 (Phase 2) — Task 6: `TokenActionService` (call-next with day lock, override call, start, complete, no-show, recall, staff and patient cancel, priority), token events, 409 mapping for version conflicts, 34 integration tests incl. concurrency tests 4 and 5 ×5. Unit tests not run (user's request). Next: REST APIs + journeys + ADRs.
 - 2026-11-14 (Phase 2) — Task 5: `TokenService` join and walk-in (lock → checks → number), `QueueProperties`, display/public codes, `TokenJoined` event, 34 integration tests incl. concurrency tests 1, 2, 3, 6 ×5. Unit tests not run (user's request). Next: staff transitions.
 - 2026-11-14 (Phase 2) — Task 4: V3 migration, `QueueDayService` (open/pause/resume/close), `EventLog` (token_event + outbox), Token/QueueDay entities, 17 integration tests. Unit tests not run (user's request). Next: `TokenService` join / walk-in.

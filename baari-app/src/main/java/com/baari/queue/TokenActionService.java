@@ -361,22 +361,6 @@ public class TokenActionService {
     }
 
     private static StaffTokenView view(QueueInfo info, TokenEntity token) {
-        return new StaffTokenView(
-                token.getId(),
-                new DisplayCode(info.queue().displayCodePrefix(), token.getNumber()).toString(),
-                token.getNumber(),
-                token.getStatus(),
-                token.getPriority(),
-                token.getVisitType(),
-                token.getSource(),
-                token.getPatientName(),
-                token.getPhoneLast4(),
-                token.getFlags().stream().map(TokenFlag::valueOf).toList(),
-                token.getServedByDoctorId(),
-                token.getJoinedAt(),
-                token.getCalledAt(),
-                token.getConsultStartedAt(),
-                token.getCompletedAt(),
-                token.getCancelledAt());
+        return TokenViews.staff(info, token);
     }
 }
