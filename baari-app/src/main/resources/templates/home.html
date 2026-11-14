@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Baari</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<main class="narrow">
+  <h1>Baari</h1>
+  <p>Logged in as <strong th:text="${caller.username()}">user</strong>
+    (<span th:text="${caller.role()}">ROLE</span>).</p>
+  <form method="post" th:action="@{/logout}">
+    <button type="submit">Log out</button>
+  </form>
+</main>
+</body>
+</html>

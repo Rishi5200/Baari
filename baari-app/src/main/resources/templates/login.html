@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff login · Baari</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<main class="narrow">
+  <h1>Baari staff login</h1>
+
+  <!-- One message for every failure (wrong password, unknown user, locked, disabled), so the
+       page never reveals which usernames exist. -->
+  <p class="alert error" th:if="${param.error}">
+    Login failed. Check your username and password.
+    After 5 failed attempts, login is blocked for 15 minutes.
+  </p>
+  <p class="alert" th:if="${param.logout}">You have been logged out.</p>
+
+  <!-- th:action adds the CSRF token as a hidden field. -->
+  <form method="post" th:action="@{/login}">
+    <label>Username
+      <input type="text" name="username" autocomplete="username" required autofocus>
+    </label>
+    <label>Password
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <button type="submit">Log in</button>
+  </form>
+</main>
+</body>
+</html>

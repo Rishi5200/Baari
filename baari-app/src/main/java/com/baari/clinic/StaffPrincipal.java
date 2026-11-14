@@ -1,5 +1,7 @@
 package com.baari.clinic;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -10,7 +12,12 @@ import java.util.UUID;
  * <p>It lives in {@code clinic} rather than {@code identity} because the clinic services take it
  * as a parameter, and identity already depends on clinic (the reverse would be a cycle).
  */
-public record StaffPrincipal(UUID userId, String username, StaffRole role, UUID clinicId, UUID doctorId) {
+public record StaffPrincipal(UUID userId, String username, StaffRole role, UUID clinicId, UUID doctorId)
+        implements Serializable {
+
+    // Stored inside the HTTP session, which lives in Redis (Java serialization).
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     public StaffPrincipal {
         Objects.requireNonNull(userId, "userId");

@@ -1,0 +1,36 @@
+/* Small hand-written stylesheet (no CSS framework, PLAN §12 Phase 3). Grows with the UI. */
+:root {
+  --fg: #1f2933;
+  --muted: #616e7c;
+  --accent: #0b6e4f;
+  --error: #b42318;
+  --bg: #f7f7f5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.5;
+}
+
+main.narrow { max-width: 26rem; margin: 3rem auto; padding: 0 1rem; }
+
+label { display: block; margin-bottom: 1rem; }
+input { display: block; width: 100%; padding: .5rem; margin-top: .25rem; font-size: 1rem; }
+
+button {
+  padding: .6rem 1.2rem;
+  font-size: 1rem;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.alert { padding: .75rem; border-left: 4px solid var(--accent); background: #fff; }
+.alert.error { border-color: var(--error); }

@@ -20,6 +20,18 @@ spring:
       port: 6379
   kafka:
     bootstrap-servers: ${BAARI_KAFKA_BOOTSTRAP:localhost:9092}
+  session:
+    timeout: 12h # idle timeout for staff sessions (PLAN §9.1)
+    data:
+      redis:
+        namespace: baari:session
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
 
 management:
   endpoints:
