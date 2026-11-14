@@ -130,7 +130,7 @@
       </plugin>
 
       <!-- PLAN §12 Phase 2: the pure queue algorithms must keep 100% branch coverage.
-           More classes join this list as they are written (NextTokenPolicy next). -->
+           More classes join this list as they are written. -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
@@ -147,6 +147,8 @@
                   <element>CLASS</element>
                   <includes>
                     <include>com.baari.queue.internal.TokenStateMachine</include>
+                    <!-- the policy and its nested Settings/State/Decision records -->
+                    <include>com.baari.queue.NextTokenPolicy*</include>
                   </includes>
                   <limits>
                     <limit>
