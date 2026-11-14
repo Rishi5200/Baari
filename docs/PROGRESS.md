@@ -3,47 +3,65 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 0 — Bootstrap (**complete**, tagged `phase-0`). Next: Phase 1.
+Phase 1 — Clinics, staff & auth (**complete locally**, not yet pushed or tagged). Next: Phase 2.
+
+## Phase 1 "Done when"
+- [x] Login/logout works; wrong password ×5 locks for 15 min: `StaffLoginIT` (MutableClock moves past the lock)
+- [x] Tenant isolation matrix: clinic B admin → 404 on every clinic A doctor/queue/staff endpoint, nothing changed: `AdminPagesIT`, plus service level in `ClinicAdminServicesIT`
+- [x] DOCTOR cannot manage staff; RECEPTIONIST cannot manage doctors (403): `AdminPagesIT`
 
 ## Done
-- Parent POM: Java 21, Spring Boot 4.1.2, Modulith 2.1.2, Spotless (palantir), JaCoCo, Surefire (`*Test`), Failsafe (`*IT`)
-- Modules `baari-app` and `baari-simulator` (placeholder main), Maven wrapper 3.9.16
-- App skeleton: `BaariApplication`, `common` (injected `Clock`, `Ids`, `DomainException` + ProblemDetail advice)
-- Flyway `V1__clinic.sql`; `application.yml` and `application-dev.yml`
-- Tests: `MutableClock`, `AbstractIntegrationTest` (singleton Postgres 17 / Redis 7 / Kafka), `ApplicationSmokeIT`, Modulith `verify()`
-- `ops/docker-compose.yml`, `ops/prometheus.yml`, `.github/workflows/ci.yml`, `.gitattributes`
-- ADR 0001
+### Phase 1
+- Flyway `V2__doctors_staff_queues.sql` (doctor, staff_user, service_queue, queue_doctor as in PLAN §7)
+- `clinic` module: JPA entities in `internal`, clinic-scoped repositories, public read-model records; `AssignedIdEntity` (Persistable) in `common`
+- Admin services: `ClinicAdminService` (platform admin creates a clinic + its first CLINIC_ADMIN), `DoctorAdminService`, `QueueAdminService` (display key returned once, stored as SHA-256; 256-bit QR secret), `StaffAdminService`; role checks in `Permissions`
+- Common errors: NotFound (404) / Forbidden (403) / Duplicate (409) / InvalidRequest (400); service Bean Validation → 400 without echoing values
+- `identity`: Spring Security form login, BCrypt(12), CSRF, Redis sessions (Spring Session, 12 h idle), lockout (`LoginAttempts`: Redis counter, lock end from injected Clock), `TenantContext` + `StaffPrincipal` argument resolver; URL role rules on top of service checks
+- Dev seed (`DevSeed`, dev profile only, idempotent): Sharma Clinic, Chandigarh; Dr. Rajesh Sharma, Dr. Neha Gill; queues `dr-sharma` (SINGLE) and `general` (POOL); one login per role (credentials in `application-dev.yml`)
+- Thymeleaf admin pages with a fragment-based layout: doctors, queues, staff, platform clinics; HTML error page
+- ADR 0007 (sessions over JWT)
 
-## Verified locally (2026-11-10, Docker 29.9.3)
-- `./mvnw verify`: BUILD SUCCESS. 8 unit tests, Modulith verify, and 2 integration tests (`ApplicationSmokeIT`: health UP, Flyway V1 applied) all pass
-- Dev profile: app started against the compose stack, `/actuator/health` = 200 UP, `flyway_schema_history` has V1 with success = true
-- Spotless fails on a badly formatted file and passes after it is removed
+### Phase 0
+- Parent POM (Java 21, Boot 4.1.2, Modulith 2.1.2, Spotless, JaCoCo, Surefire/Failsafe), modules `baari-app` + `baari-simulator`, wrapper
+- App skeleton, Flyway V1, test infra (`MutableClock`, `AbstractIntegrationTest`), compose stack, CI, ADR 0001. Tagged `phase-0`, CI green.
 
-## CI
-- GitHub Actions run on `f8f4c69` (ubuntu, Temurin 21, `./mvnw verify` with Testcontainers): success. https://github.com/Rishi5200/Baari/actions/runs/43581592618
+## Verified locally (2026-11-14)
+- `./mvnw verify`: BUILD SUCCESS. 32 unit tests, 55 integration tests, Modulith verify
+- Dev profile on the compose stack: seed runs once, seeded receptionist and clinic admin log in through the real form, session stored in Redis, admin pages render with seeded data
 
 ## Bugs found and fixed while verifying
-- Failsafe was only in `pluginManagement`, so `*IT` tests never ran and the earlier "green" build proved nothing about them. Now active.
-- Java files were committed with CRLF, which Spotless rejects under `.gitattributes` (`eol=lf`). Repo now has `core.autocrlf=false` and sources are LF.
+- Boot 4 ignores the old property `spring.session.redis.namespace`; the right one is `spring.session.data.redis.namespace`. Sessions were silently using the default key prefix; the session test now checks the keys exist.
 
 ## In progress
 - Nothing
 
 ## Next
-1. Phase 1 — Clinics, staff & auth (PLAN §12)
+1. Push Phase 1 to GitHub, confirm CI is green, tag `phase-1`
+2. Phase 2 — Queue core (PLAN §12)
 
 ## Open questions for the user
-- Port 8080 on this machine is held by an unrelated process (`AgentService`, PID 5688), so the app can't use its default port here. Run it with `--server.port=8081` locally, or tell me if you want a different default.
-- Prometheus and Grafana images use `:latest` for now; pin versions in Phase 8?
-- The compose stack (`ops-*` containers) is left running; stop with `docker compose -f ops/docker-compose.yml down`.
+- Nothing stops a clinic admin from disabling or demoting their own account (could leave a clinic with no admin). Add a guard?
+- Port 8080 on this machine is held by an unrelated process (`AgentService`), so run locally with `--server.port=8081`.
+- `/actuator/prometheus` is public for local scraping; lock down in Phase 8.
+- Prometheus and Grafana images use `:latest`; pin versions in Phase 8?
 
 ## Notes / decisions
 - `Ids.newId()` uses random UUIDs, not UUIDv7: UUIDv7 needs the current time and the only allowed time source is an injected `Clock`.
 - Boot 4.2 is only at RC, so we stay on 4.1.2.
 - Git identity on this machine is `Admin` with a different email from the Claude account; commits use that.
+- Phase 1 choices not spelled out in PLAN (kept small, easy to change):
+  - A DOCTOR login must be linked to a doctor record; other roles must not be.
+  - Creating a clinic also creates its first CLINIC_ADMIN (otherwise nobody could manage it).
+  - Doctors and receptionists may read the doctor and queue lists; only CLINIC_ADMIN changes them or sees staff.
+  - A SINGLE queue has at most one doctor (zero allowed during setup). Queue slugs can't change after creation (printed on QR posters).
+  - Granting PLATFORM_ADMIN from a clinic is a 403. Passwords 8–72 chars (BCrypt limit). Usernames lowercase.
+  - Login failures all show one generic message so usernames can't be probed.
+  - `settings` jsonb columns are not mapped yet (DB default `{}`).
+  - Dev seed: token prefixes A (`dr-sharma`) and B (`general`); one fixed dev TV display key in `application-dev.yml`.
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
+- 2026-11-14 (later) — Phase 1 built in 5 commits (schema, admin services, security, dev seed, admin pages); all Done-when items covered by tests. Next: push + CI + tag, then Phase 2.
 - 2026-11-14 — Pushed to github.com/Rishi5200/Baari; CI green. Phase 0 done, tagged `phase-0`. Next: Phase 1.
 - 2026-11-10 (later) — Docker fixed. Full verify with ITs green, dev profile healthy, Failsafe and line-ending bugs fixed. Next: remote + CI, then Phase 1.
 - 2026-11-10 — Phase 0 built without Docker: POMs, wrapper, skeleton, test infra, ops files, CI, ADR 0001. Integration tests unrun.
