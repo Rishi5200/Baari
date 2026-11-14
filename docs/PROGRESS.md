@@ -3,7 +3,18 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 1 — Clinics, staff & auth (**complete**, tagged `phase-1`, CI green). Next: Phase 2.
+Phase 2 — Queue core (in progress). Phase 1 complete, tagged `phase-1`.
+
+## Phase 2 plan (7 tasks)
+1. [x] `TokenStateMachine` + every status × command test + JaCoCo 100% branch rule
+2. [ ] `NextTokenPolicy` + §5 tests
+3. [ ] `common.crypto`: phone normalisation, AES-GCM, HMAC hash, `Masking.phone()`
+4. [ ] V3 migration (queue_day, token, token_event, outbox_event) + `QueueDayService`
+5. [ ] `TokenService` join / walk-in + concurrency tests 1, 2, 3, 6
+6. [ ] Staff transitions (call-next row lock, start, complete, no-show, recall, cancel, priority) + tests 4, 5
+7. [ ] REST APIs (Appendix A) + journeys J1–J7 + ADRs 0003–0005
+
+Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; rate limits and rotating-QR checks stay in Phase 8; ETA fields null until Phase 4; doctors act only on queues they're assigned to; POOL call-next needs a doctor; crypto keys from env vars, fixed placeholders in dev/test; concurrency tests use `@RepeatedTest(5)`.
 
 ## Phase 1 "Done when"
 - [x] Login/logout works; wrong password ×5 locks for 15 min: `StaffLoginIT` (MutableClock moves past the lock)
@@ -37,10 +48,10 @@ Phase 1 — Clinics, staff & auth (**complete**, tagged `phase-1`, CI green). Ne
 - Boot 4 ignores the old property `spring.session.redis.namespace`; the right one is `spring.session.data.redis.namespace`. Sessions were silently using the default key prefix; the session test now checks the keys exist.
 
 ## In progress
-- Nothing
+- Phase 2, task 2: `NextTokenPolicy`
 
 ## Next
-1. Phase 2 — Queue core (PLAN §12)
+1. Phase 2 tasks 2–7 (see plan above)
 
 ## Open questions for the user
 - Nothing stops a clinic admin from disabling or demoting their own account (could leave a clinic with no admin). Add a guard?
@@ -61,9 +72,15 @@ Phase 1 — Clinics, staff & auth (**complete**, tagged `phase-1`, CI green). Ne
   - Login failures all show one generic message so usernames can't be probed.
   - `settings` jsonb columns are not mapped yet (DB default `{}`).
   - Dev seed: token prefixes A (`dr-sharma`) and B (`general`); one fixed dev TV display key in `application-dev.yml`.
+- Phase 2 state machine choices (PLAN §4 leaves these open):
+  - WAITING → IN_CONSULTATION ("walked straight in") is allowed and flagged `DIRECT_START`.
+  - A forced no-show is flagged `FORCED_NO_SHOW` only when it happens before the grace period ends; the grace boundary itself counts as elapsed.
+  - The SYSTEM actor can't cancel; day close uses its own command (open tokens → EXPIRED, IN_CONSULTATION → COMPLETED + `AUTO_CLOSED`).
+  - Refusals carry a reason: illegal transition, grace not elapsed, or recall on another day.
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
+- 2026-11-14 (Phase 2) — Task 1: `TokenStateMachine` (pure), 104 unit tests, JaCoCo check enforces 100% branch coverage (48/48). Next: `NextTokenPolicy`.
 - 2026-11-14 (end) — Phase 1 pushed, CI green, tagged `phase-1`. Next: Phase 2.
 - 2026-11-14 (later) — Phase 1 built in 5 commits (schema, admin services, security, dev seed, admin pages); all Done-when items covered by tests. Next: push + CI + tag, then Phase 2.
 - 2026-11-14 — Pushed to github.com/Rishi5200/Baari; CI green. Phase 0 done, tagged `phase-0`. Next: Phase 1.
