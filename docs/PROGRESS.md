@@ -17,7 +17,7 @@ Phase 2 — Queue core (in progress). Phase 1 complete, tagged `phase-1`.
 ## Phase 2 "Done when" (not tagged yet)
 - [x] All six concurrency tests in §6.4 pass, repeated 5× (locally; not yet in CI): `TokenServiceIT` (1, 2, 3, 6), `TokenActionServiceIT` (4, 5)
 - [x] Journeys J1–J7 pass as API-level integration tests (ETA null; J1's "3 ahead" notification is Phase 5, J7's two-server projection is Phase 4): `JourneysIT`
-- [ ] State machine and policy have 100% branch coverage: **not checked since task 4**. Needs a full `./mvnw verify` with unit tests (the JaCoCo rule runs there). Expected to hold: those classes haven't changed since tasks 1–2, when the rule passed.
+- [x] State machine and policy have 100% branch coverage: JaCoCo rule passed in the full `./mvnw verify` (2026-11-14)
 
 Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; rate limits and rotating-QR checks stay in Phase 8; ETA fields null until Phase 4; doctors act only on queues they're assigned to; POOL call-next needs a doctor; crypto keys from env vars, fixed placeholders in dev/test; concurrency tests use `@RepeatedTest(5)`.
 
@@ -63,10 +63,10 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 
 - Task 7: integration tests 160/160 green, Spotless clean; unit tests, Modulith verify and JaCoCo check not run.
 
-**Before tagging `phase-2`:** run the full `./mvnw verify` (unit tests + `ModularityTest` + JaCoCo rule), push, and check CI.
+**Full verify run (2026-11-14, after task 7):** BUILD SUCCESS. 184 unit tests (incl. `ModularityTest`), 160 integration tests, Spotless clean, JaCoCo rule met. **Before tagging `phase-2`:** push and check CI.
 
 ## In progress
-- Nothing. Phase 2 tasks are all built; waiting on the full verify with unit tests, push and CI before tagging.
+- Nothing. Phase 2 tasks are all built and the full verify is green; waiting on CI before tagging `phase-2`.
 
 ## Next
 1. Phase 2 tasks 4–7 (see plan above)
