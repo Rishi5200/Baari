@@ -9,7 +9,7 @@ Phase 2 — Queue core (in progress). Phase 1 complete, tagged `phase-1`.
 1. [x] `TokenStateMachine` + every status × command test + JaCoCo 100% branch rule
 2. [x] `NextTokenPolicy` + §5 tests (incl. 1,000 random queues) + projection + recall sort key
 3. [x] `common.crypto`: phone normalisation, AES-GCM, HMAC hash, `Masking.phone()`, JPA converter, keys from config
-4. [ ] V3 migration (queue_day, token, token_event, outbox_event) + `QueueDayService`
+4. [x] V3 migration (queue_day, token, token_event, outbox_event) + `QueueDayService` (unit tests not run, see below)
 5. [ ] `TokenService` join / walk-in + concurrency tests 1, 2, 3, 6
 6. [ ] Staff transitions (call-next row lock, start, complete, no-show, recall, cancel, priority) + tests 4, 5
 7. [ ] REST APIs (Appendix A) + journeys J1–J7 + ADRs 0003–0005
@@ -47,8 +47,14 @@ Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; r
 ## Bugs found and fixed while verifying
 - Boot 4 ignores the old property `spring.session.redis.namespace`; the right one is `spring.session.data.redis.namespace`. Sessions were silently using the default key prefix; the session test now checks the keys exist.
 
+## Unit tests not run yet (user will run them later)
+At the user's request, from task 4 on the build ran without unit tests:
+`./mvnw verify -Dtest=NONE -Dsurefire.failIfNoSpecifiedTests=false -Djacoco.skip=true`.
+That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 100% branch check.
+- Task 4: integration tests 72/72 green, Spotless clean; unit tests, Modulith verify and JaCoCo check not run.
+
 ## In progress
-- Phase 2, task 4: V3 migration + `QueueDayService`
+- Phase 2, task 5: `TokenService` join / walk-in + concurrency tests 1, 2, 3, 6
 
 ## Next
 1. Phase 2 tasks 4–7 (see plan above)
@@ -91,9 +97,19 @@ Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; r
   - Dev keys in `application-dev.yml`, test keys in `AbstractIntegrationTest` (both public, labelled as such).
   - `common.crypto` is a Modulith named interface so `queue` can use it.
   - `PhoneNumber.toString()` is masked, so an accidental log line can't leak a number.
+- Phase 2 queue day choices (PLAN §3, §7, §11.1 leave these open):
+  - `token_event.token_id` is nullable (PLAN has NOT NULL) so day events (opened, paused, resumed, closed) take a seq too; the per-day sequence stays gap-free.
+  - Added a `QueueDayResumed` event (not in the §11.1 list) so every day status change has one.
+  - Repeating an action already in effect (open an open or paused day, pause a paused one, resume an open one, close a closed one) is a no-op that returns the day. A closed day can't be reopened, paused or resumed (410 `queue-closed`). Acting before today's day exists is 409 `queue-not-opened`.
+  - Open uses `INSERT … ON CONFLICT DO NOTHING`, so concurrent opens create one day (tested with 20 threads).
+  - Who may run a day: any staff of the queue's clinic; a DOCTOR only for assigned queues (else 404); platform admin 403.
+  - Day close writes one `token_event` per changed token (EXPIRED, or COMPLETED for auto-closed consultations) and one `QueueDayClosed` outbox event with the counts; no per-token outbox events. Close events are recorded as STAFF with the closing user's id.
+  - Outbox row id = event id; aggregate = queue day; partition key = queue day id; event type = record name. `flags` stores `TokenFlag` names (upper case).
+  - New `clinic.QueueDirectory` gives the queue module a queue and its clinic's time zone (no permission check; the queue module checks access).
 
 ## Session log
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
+- 2026-11-14 (Phase 2) — Task 4: V3 migration, `QueueDayService` (open/pause/resume/close), `EventLog` (token_event + outbox), Token/QueueDay entities, 17 integration tests. Unit tests not run (user's request). Next: `TokenService` join / walk-in.
 - 2026-11-14 (Phase 2) — Task 3: `common.crypto` (PhoneNumber, Masking, FieldCipher AES-256-GCM, PhoneHasher HMAC-SHA256, EncryptedStringConverter, startup key checks), 48 unit tests. Next: V3 migration + `QueueDayService`.
 - 2026-11-14 (Phase 2) — Task 2: `NextTokenPolicy` (next, projectOrder, recallSortKey), 22 unit tests incl. 1,000 random queues; added to the 100% branch rule. Next: `common.crypto`.
 - 2026-11-14 (Phase 2) — Task 1: `TokenStateMachine` (pure), 104 unit tests, JaCoCo check enforces 100% branch coverage (48/48). Next: `NextTokenPolicy`.
