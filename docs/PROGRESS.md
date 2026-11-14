@@ -110,7 +110,7 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 - Phase 2 token issuance choices (PLAN §6.1 / Appendix A leave these open):
   - Order inside the transaction: lock the queue day row, then check idempotency key → day status → active token for the phone → open-token limit, then take the number. Everything is checked under the lock, so the unlocked pre-check PLAN mentions isn't needed, and no number is ever burned (a failed request rolls its number back). The unique constraints stay as a backstop: on a violation the whole transaction is retried once so the checks see the winning row. That retry path isn't exercised by a test (it can't be reached while every issuer takes the lock).
   - A retry with the same idempotency key returns its token whatever happened since, even after the day closed (status EXPIRED, position null).
-  - While a day is PAUSED, QR joins get 423 but reception can still add walk-ins. **Confirm this is what you want.**
+  - While a day is PAUSED, QR joins get 423 but reception can still add walk-ins (confirmed by the user, 2026-11-14).
   - Open-token limit (`max-open-tokens`, 300) counts WAITING, CALLED, IN_CONSULTATION and NO_SHOW (same set as the phone index); over the limit → 409 `queue-full`. Applies to walk-ins too.
   - Patients joining by QR are always NORMAL; reception picks the priority for walk-ins. Name required (≤ 60 chars) for both; phone optional; walk-in idempotency key optional.
   - `position` is 1-based (1 = called next), computed with `NextTokenPolicy.projectOrder`.
