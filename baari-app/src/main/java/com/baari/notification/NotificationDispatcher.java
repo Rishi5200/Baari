@@ -92,12 +92,15 @@ class NotificationDispatcher {
             List<Due> due = jdbc.sql("""
                             SELECT id, token_id, kind, channel, attempts
                               FROM notification
-                             WHERE status = 'PENDING' AND next_attempt_at <= :now
+                             WHERE status = 'PENDING' AND next_attempt_at <= :now AND channel IN (:channels)
                              ORDER BY next_attempt_at, id
                              LIMIT :limit
                                FOR UPDATE SKIP LOCKED
                             """)
                     .param("now", now)
+                    .param(
+                            "channels",
+                            channels.stream().map(NotificationChannel::name).toList())
                     .param("limit", BATCH)
                     .query((rs, n) -> new Due(
                             rs.getObject("id", UUID.class),

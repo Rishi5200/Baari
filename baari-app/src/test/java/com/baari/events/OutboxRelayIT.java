@@ -27,6 +27,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -34,6 +35,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * The relay runs on its normal schedule; tests insert outbox rows directly and watch the topic.
  */
 @Import(OutboxRelayIT.SideEffectConsumer.class)
+@TestPropertySource(properties = {"spring.kafka.listener.auto-startup=true", "baari.events.group-prefix=relay-it-"})
 class OutboxRelayIT extends AbstractIntegrationTest {
 
     @Autowired

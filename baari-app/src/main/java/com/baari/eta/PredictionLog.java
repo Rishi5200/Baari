@@ -2,7 +2,6 @@ package com.baari.eta;
 
 import com.baari.common.Ids;
 import com.baari.queue.QueueChanged;
-import com.baari.queue.TokenEvents.ConsultStarted;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -12,8 +11,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,7 +37,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * run is in progress are merged into one more run (ADR 0010). Doing it on the request thread, after
  * commit, needs a second database connection while the first is still held, which starved the
  * connection pool under 200 concurrent joins. A failure here is logged and swallowed: a prediction
- * log problem must never undo a call-next. Phase 5 moves this to a Kafka consumer.
+ * log problem must never undo a call-next. Filling in the actual waits is a Kafka consumer ({@link EtaActualsRecorder}).
  */
 @Component
 class PredictionLog {
@@ -70,7 +67,6 @@ class PredictionLog {
         private UUID queueId;
         private boolean running;
         private boolean projectionPending;
-        private final Deque<Runnable> tasks = new ArrayDeque<>();
 
         synchronized void requestProjection(UUID queueId) {
             this.queueId = queueId;
@@ -78,13 +74,8 @@ class PredictionLog {
             start();
         }
 
-        synchronized void add(Runnable task) {
-            tasks.add(task);
-            start();
-        }
-
         synchronized boolean idle() {
-            return !running && !projectionPending && tasks.isEmpty();
+            return !running && !projectionPending;
         }
 
         private void start() {
@@ -94,24 +85,20 @@ class PredictionLog {
             }
         }
 
-        /** Runs the pending work until there is none; projections go first so JOIN rows exist before actuals. */
+        /** Runs the pending projection until there is none. */
         private void drain() {
             while (true) {
-                Runnable next;
+                UUID queue;
                 synchronized (this) {
-                    if (projectionPending) {
-                        projectionPending = false;
-                        UUID queue = queueId;
-                        next = () -> logPredictions(queue);
-                    } else if (!tasks.isEmpty()) {
-                        next = tasks.poll();
-                    } else {
+                    if (!projectionPending) {
                         running = false;
                         return;
                     }
+                    projectionPending = false;
+                    queue = queueId;
                 }
                 try {
-                    next.run();
+                    logPredictions(queue);
                 } catch (RuntimeException e) {
                     log.warn("ETA prediction log failed for queue {}", queueId, e);
                 }
@@ -124,12 +111,7 @@ class PredictionLog {
         lane(event.queueDayId()).requestProjection(event.queueId());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    void onConsultStarted(ConsultStarted event) {
-        lane(event.queueDayId()).add(() -> recordActuals(event.tokenId(), event.occurredAt()));
-    }
-
-    /** Test hook: waits until every queue's pending work has run. */
+    /** Test hook: waits until every queue's pending predictions have been logged. */
     void awaitIdle() {
         long stop = System.nanoTime() + Duration.ofSeconds(20).toNanos();
         while (System.nanoTime() < stop) {
@@ -218,7 +200,7 @@ class PredictionLog {
     }
 
     /** Fills {@code actual_wait_s} on the token's predictions that have none yet, and reports the errors. */
-    private void recordActuals(UUID tokenId, Instant startedAt) {
+    void recordActuals(UUID tokenId, Instant startedAt) {
         record Row(String trigger, String estimator, int predicted, int min, int max, int actual) {}
         List<Row> rows = jdbc.sql("""
                         UPDATE eta_prediction

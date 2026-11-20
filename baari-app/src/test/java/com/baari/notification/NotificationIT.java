@@ -51,7 +51,12 @@ import org.springframework.test.context.TestPropertySource;
  */
 @Import(NotificationIT.TestChannelConfig.class)
 @TestPropertySource(
-        properties = {"baari.notifications.dispatch-delay-ms=3600000", "baari.notifications.log-enabled=false"})
+        properties = {
+            "baari.notifications.dispatch-delay-ms=3600000",
+            "baari.notifications.log-enabled=false",
+            "spring.kafka.listener.auto-startup=true",
+            "baari.events.group-prefix=notification-it-"
+        })
 class NotificationIT extends AbstractIntegrationTest {
 
     private static final StaffPrincipal PLATFORM =
@@ -102,6 +107,9 @@ class NotificationIT extends AbstractIntegrationTest {
 
     @Autowired
     NotificationDispatcher dispatcher;
+
+    @Autowired
+    NotificationPlanner planner;
 
     @Autowired
     TokenService tokens;
@@ -310,7 +318,7 @@ class NotificationIT extends AbstractIntegrationTest {
         assertThat(channel.sentTo(first.tokenId()).stream().filter(t -> t.contains("it is your turn")))
                 .hasSize(1);
         assertThat(jdbc.sql("SELECT count(*) FROM processed_event WHERE consumer = ? AND event_id = ?")
-                        .param(NotificationPlanner.CONSUMER)
+                        .param(planner.consumerName())
                         .param(eventId)
                         .query(Integer.class)
                         .single())

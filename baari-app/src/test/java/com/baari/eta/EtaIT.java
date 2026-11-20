@@ -2,6 +2,7 @@ package com.baari.eta;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 import com.baari.AbstractIntegrationTest;
 import com.baari.clinic.ClinicAdminService;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.convention.TestBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -48,6 +50,7 @@ import tools.jackson.databind.json.JsonMapper;
  * the prediction log with its actual waits (PLAN §8, §12 Phase 4). The clock is controlled, the
  * doctor sees patients for exactly as long as the test says, and each test uses a fresh clinic.
  */
+@TestPropertySource(properties = {"spring.kafka.listener.auto-startup=true", "baari.events.group-prefix=eta-it-"})
 class EtaIT extends AbstractIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-11-14T04:30:00Z"); // 10:00 in India
@@ -154,6 +157,17 @@ class EtaIT extends AbstractIntegrationTest {
         actions.start(doctor, token.tokenId());
         CLOCK.advance(Duration.ofSeconds(seconds));
         actions.complete(doctor, token.tokenId());
+    }
+
+    /** Actual waits are filled in by a Kafka consumer, a moment after the consultation starts. */
+    private void awaitActuals(UUID tokenId) {
+        await().atMost(Duration.ofSeconds(30))
+                .until(() ->
+                        jdbc.sql("SELECT count(*) FROM eta_prediction WHERE token_id = ? AND actual_wait_s IS NULL")
+                                        .param(tokenId)
+                                        .query(Integer.class)
+                                        .single()
+                                == 0);
     }
 
     private List<String> triggers(UUID tokenId) {
@@ -346,6 +360,7 @@ class EtaIT extends AbstractIntegrationTest {
         CLOCK.advance(Duration.ofMinutes(12));
         actions.callNext(doctor, queue, null);
         actions.start(doctor, patient.tokenId());
+        awaitActuals(patient.tokenId());
 
         Map<String, Object> row = db().sql("""
                         SELECT predicted_at, position, predicted_wait_s, range_min_s, range_max_s, estimator, actual_wait_s
@@ -370,6 +385,7 @@ class EtaIT extends AbstractIntegrationTest {
         actions.callNext(doctor, queue, null);
         actions.callNext(doctor, queue, null);
         actions.start(doctor, second.tokenId());
+        awaitActuals(second.tokenId());
 
         assertThat(db().sql("SELECT actual_wait_s FROM eta_prediction WHERE token_id = ? AND trigger = 'JOIN'")
                         .param(second.tokenId())
@@ -383,6 +399,7 @@ class EtaIT extends AbstractIntegrationTest {
     void aPatientSeenAtOnceHasAnActualWaitOfZero() {
         IssuedToken patient = walkIn();
         actions.start(doctor, patient.tokenId()); // direct start, straight from WAITING
+        awaitActuals(patient.tokenId());
 
         assertThat(db().sql("SELECT actual_wait_s FROM eta_prediction WHERE token_id = ?")
                         .param(patient.tokenId())

@@ -3,7 +3,7 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 4 — ETA v1 (built and verified locally 2026-11-20, see below; CI and the `phase-4` tag are still open). Phases 1 to 3 complete, tagged `phase-1`, `phase-2`, `phase-3`.
+Phase 5 — Events & notifications (in progress, 2026-11-20). Done: outbox relay, dedup, DLT, planner, dispatcher, log and SMS-stub channels, actuals consumer (ADR 0011). Left: Telegram channel (waiting for a bot token from the user), full verify, CI, tag `phase-5`. Phases 1 to 4 complete, tagged `phase-1` to `phase-4`.
 
 ## Phase 4 plan (all built, 2026-11-20)
 1. [x] Queue read models for ETA: `QueueLiveState`, `TokenLocator`, `ServiceSample`/`ServiceHistory` (queue module, no patient details); `EventLog.publish` also publishes the domain event in-process
@@ -115,10 +115,12 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 **Full verify run (2026-11-14, after task 7):** BUILD SUCCESS. 184 unit tests (incl. `ModularityTest`), 160 integration tests, Spotless clean, JaCoCo rule met. **Before tagging `phase-2`:** push and check CI.
 
 ## In progress
-- Phase 4 is built and verified locally. Left: check CI, tag `phase-4`.
+- Phase 5 (ADR 0011). Built and tested: `events` (OutboxRelay, ProcessedEvents, topics, DLT error handler; `OutboxRelayIT` incl. Kafka paused during writes, duplicate delivery, poison message), `notification` (planner, dispatcher with retries, LogChannel, SmsChannel stub; `NotificationIT` 6 tests), `EtaActualsRecorder` replacing the in-process actuals listener.
+- Full `./mvnw verify` green (215 integration tests, Spotless, JaCoCo). Tests: Kafka listeners are off by default (`src/test/resources/application.properties`); EtaIT, NotificationIT and OutboxRelayIT turn them on with their own `baari.events.group-prefix`, because cached contexts would otherwise share consumer groups.
+- Not done: TelegramChannel with link and webhook (user will supply the bot later), a language per token (messages are English only; Hindi texts exist), the manual Telegram check on a real phone, a full `./mvnw verify`, CI, tag `phase-5`.
 
 ## Next
-1. Phase 5: events and notifications (outbox relay to Kafka, idempotent consumers; move the ETA prediction log and history invalidation from in-process listeners to consumers)
+1. Finish Phase 5: Telegram channel, full verify, CI, tag. (Rolling statistics stay Postgres-backed with a one-minute cache, so no RollingStatsUpdater; see ADR 0011.)
 2. Last-admin guard (ADR 0009 item 1), small `clinic` change with an integration test; can ride along with any phase
 3. Phase 8: lock down `/actuator/prometheus`, pin Prometheus and Grafana versions (ADR 0009 items 2 and 3). Deploy blocker for Phase 9.
 
@@ -200,6 +202,7 @@ None. The four earlier questions were decided by Claude on 2026-11-20 and record
   - ADRs written: 0003 (counter row), 0004 (call-next row lock), 0005 (transactional outbox).
 
 ## Session log
+- 2026-11-20 (Phase 5, in progress) — Outbox relay, dedup, DLT, notification planner and dispatcher, actuals consumer, ADR 0011, `OutboxRelayIT` (4) and `NotificationIT` (6). Telegram waits for the user's bot. Next: full verify, then Telegram.
 - 2026-11-20 (Phase 4) — ETA v1 in one go: queue read models, pure estimators, projector, smoother and display rounding (61 unit tests), `EtaService`, prediction log with actuals and metrics, V4 migration, token page, stream and console wiring in English and Hindi, ADR 0010, `EtaIT` (17). Next: browser check, push, CI, tag `phase-4`, then Phase 5.
 - 2026-11-20 (Phase 3 close) — CI green on `cc353ad`, reconnect check done by hand, open questions decided (ADR 0009), tagged `phase-3` on `cc353ad`. Next: Phase 4.
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->

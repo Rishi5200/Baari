@@ -13,6 +13,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Header;
@@ -38,7 +39,10 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 class NotificationPlanner {
 
-    static final String CONSUMER = "notification-planner";
+    private static final String NAME = "notification-planner";
+
+    /** The consumer name used for dedup; also the Kafka group (a prefix lets tests keep contexts apart). */
+    private final String consumer;
 
     private final ProcessedEvents processed;
     private final QueueQueryService queues;
@@ -59,7 +63,9 @@ class NotificationPlanner {
             JdbcClient jdbc,
             TransactionTemplate tx,
             JsonMapper json,
-            Clock clock) {
+            Clock clock,
+            @Value("${baari.events.group-prefix:}") String groupPrefix) {
+        this.consumer = groupPrefix + NAME;
         this.processed = processed;
         this.queues = queues;
         this.eta = eta;
@@ -71,7 +77,7 @@ class NotificationPlanner {
         this.clock = clock;
     }
 
-    @KafkaListener(topics = EventTopics.QUEUE_EVENTS, groupId = CONSUMER)
+    @KafkaListener(topics = EventTopics.QUEUE_EVENTS, groupId = "${baari.events.group-prefix:}" + NAME)
     void on(
             @Payload String payload,
             @Header(EventHeaders.EVENT_ID) byte[] eventId,
@@ -79,10 +85,15 @@ class NotificationPlanner {
         UUID id = UUID.fromString(new String(eventId, StandardCharsets.UTF_8));
         String type = new String(eventType, StandardCharsets.UTF_8);
         tx.executeWithoutResult(status -> {
-            if (processed.claim(CONSUMER, id)) {
+            if (processed.claim(consumer, id)) {
                 plan(type, json.readTree(payload));
             }
         });
+    }
+
+    /** The dedup consumer name of this instance's planner. */
+    String consumerName() {
+        return consumer;
     }
 
     private void plan(String type, JsonNode event) {

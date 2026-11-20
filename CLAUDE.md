@@ -113,7 +113,7 @@ Allowed dependencies (arrow = "may call"):
 `web → queue, clinic, eta, realtime, analytics` ·
 `queue → clinic, common` · `eta → queue (read models), clinic, common` ·
 `realtime → queue, eta, common` (+ `clinic.StaffPrincipal` for the staff stream) · `notification → queue, eta, clinic, events, common` ·
-`events → common` · `identity → clinic, common` · everything → `common`.
+`events → common` · `eta → events` (consumers) · `identity → clinic, common` · everything → `common`.
 `queue` must NOT depend on `eta`, `realtime`, or `notification`. It publishes events instead.
 
 ---
