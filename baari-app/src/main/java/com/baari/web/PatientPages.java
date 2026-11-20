@@ -2,6 +2,8 @@ package com.baari.web;
 
 import com.baari.common.DomainException;
 import com.baari.common.Ids;
+import com.baari.eta.EtaService;
+import com.baari.eta.PatientTokenView;
 import com.baari.queue.IssuedToken;
 import com.baari.queue.JoinRequest;
 import com.baari.queue.PublicQueueView;
@@ -38,7 +40,10 @@ class PatientPages {
     private final TokenService tokens;
     private final TokenActionService actions;
 
-    PatientPages(QueueQueryService queries, TokenService tokens, TokenActionService actions) {
+    private final EtaService eta;
+
+    PatientPages(QueueQueryService queries, TokenService tokens, TokenActionService actions, EtaService eta) {
+        this.eta = eta;
         this.queries = queries;
         this.tokens = tokens;
         this.actions = actions;
@@ -100,7 +105,9 @@ class PatientPages {
 
     @GetMapping("/t/{publicCode}")
     String tokenPage(@PathVariable String publicCode, Model model) {
-        model.addAttribute("view", queries.publicToken(publicCode));
+        PatientTokenView patient = eta.patientView(publicCode);
+        model.addAttribute("view", patient.token());
+        model.addAttribute("eta", patient.eta());
         model.addAttribute("publicCode", publicCode);
         return "patient/token";
     }

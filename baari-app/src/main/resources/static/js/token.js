@@ -27,6 +27,17 @@
       ahead = view.peopleAhead === 0 ? T.next : T.ahead.replace('{0}', view.peopleAhead);
     }
     byId('ahead').textContent = ahead;
+
+    // The server sends the already rounded range; the words come from the message file.
+    const eta = view.status === 'WAITING' ? view.eta : null;
+    let etaText = '';
+    if (eta) {
+      etaText = eta.kind === 'RANGE'
+        ? T.etaRange.replace('{0}', eta.fromMinutes).replace('{1}', eta.toMinutes)
+        : (eta.kind === 'FEW_MINUTES' ? T.etaFew : T.etaOver);
+    }
+    byId('eta').textContent = etaText;
+    byId('eta').hidden = !eta;
     byId('serving').textContent = view.nowServing.length ? view.nowServing.join(', ') : T.nobody;
     byId('closed').hidden = view.queueStatus !== 'CLOSED';
     byId('paused').hidden = view.queueStatus !== 'PAUSED';

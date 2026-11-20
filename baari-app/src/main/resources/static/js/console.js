@@ -12,6 +12,9 @@
   const el = Baari.el;
 
   let board = null;
+  // Predicted start per waiting token id. Only the stream carries it; the plain board fetch after a
+  // button press does not, so the last value stays until the next stream snapshot.
+  let estimates = {};
   let toastTimer = null;
 
   // --- talking to the server ---
@@ -119,6 +122,13 @@
     if (token.priority !== 'NORMAL') { li.appendChild(el('span', 'badge', T.priority[token.priority])); }
     li.appendChild(el('span', 'muted', T.visit[token.visitType] || ''));
     if (token.phoneLast4) { li.appendChild(el('span', 'muted', '···' + token.phoneLast4)); }
+    const estimate = estimates[token.id];
+    if (estimate) {
+      const time = new Date(estimate.expectedStartAt)
+        .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const minutes = Math.round(estimate.waitSeconds / 60);
+      li.appendChild(el('span', 'muted eta', T.expected.replace('{0}', time).replace('{1}', minutes)));
+    }
     const box = el('span', 'actions');
     actions.forEach(function (a) { box.appendChild(a); });
     li.appendChild(box);
@@ -137,6 +147,7 @@
 
   function render(next) {
     board = next;
+    if (next.estimates) { estimates = next.estimates; }
     const status = board.day ? board.day.status : 'NOT_OPENED';
     byId('day-status').textContent = T.dayStatus[status];
     byId('day-status').className = 'pill ' + status.toLowerCase();

@@ -94,5 +94,8 @@ public class EventLog {
                 .param("payload", json.writeValueAsString(event))
                 .param("createdAt", Sql.timestamptz(event.occurredAt()))
                 .update();
+        // The same event, in-process, for listeners that must react after commit (for example ETA
+        // statistics). Until Kafka consumers exist (Phase 5) this is how other modules learn of it.
+        publisher.publishEvent(event);
     }
 }

@@ -18,6 +18,9 @@
   <p class="ahead" id="ahead"
      th:text="${view.status().name() != 'WAITING'} ? '' : (${view.peopleAhead() == 0} ? #{token.next} : #{token.ahead(${view.peopleAhead()})})">Ahead of you: 3</p>
 
+  <p class="eta" id="eta" th:hidden="${eta == null}"
+     th:text="${eta == null} ? '' : (${eta.kind().name() == 'FEW_MINUTES'} ? #{token.eta.few} : (${eta.kind().name() == 'RANGE'} ? #{token.eta.range(${eta.fromMinutes()},${eta.toMinutes()})} : #{token.eta.over}))">Your turn in about 20–30 minutes</p>
+
   <p class="alert" id="closed" th:hidden="${view.queueStatus().name() != 'CLOSED'}" th:text="#{token.closed}">Closed.</p>
   <p class="alert" id="paused" th:hidden="${view.queueStatus().name() != 'PAUSED'}" th:text="#{token.paused}">Paused.</p>
 
@@ -55,6 +58,9 @@
     },
     next: /*[[#{token.next}]]*/ 'You are next',
     ahead: /*[[#{token.ahead('{0}')}]]*/ 'Ahead of you: {0}',
+    etaFew: /*[[#{token.eta.few}]]*/ 'Your turn: in a few minutes',
+    etaRange: /*[[#{token.eta.range('{0}', '{1}')}]]*/ 'Your turn in about {0}–{1} minutes',
+    etaOver: /*[[#{token.eta.over}]]*/ 'Your turn: more than 2 hours away',
     nobody: /*[[#{token.nobody}]]*/ 'No one yet',
     room: /*[[#{token.called.room('{0}')}]]*/ 'Please go to {0}',
     noRoom: /*[[#{token.called.noRoom}]]*/ 'Please go in to see the doctor',

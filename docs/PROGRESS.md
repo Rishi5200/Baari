@@ -3,7 +3,26 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 3 — UI & real-time (complete, tagged `phase-3`). Phases 1 and 2 complete, tagged `phase-1`, `phase-2`. Next: Phase 4.
+Phase 4 — ETA v1 (built and verified locally 2026-11-20, see below; CI and the `phase-4` tag are still open). Phases 1 to 3 complete, tagged `phase-1`, `phase-2`, `phase-3`.
+
+## Phase 4 plan (all built, 2026-11-20)
+1. [x] Queue read models for ETA: `QueueLiveState`, `TokenLocator`, `ServiceSample`/`ServiceHistory` (queue module, no patient details); `EventLog.publish` also publishes the domain event in-process
+2. [x] Pure classes in the new `eta` module: `Distribution`, `ServiceContext`, `ServiceTimeEstimator`, `DefaultEstimator`, `RollingStatsEstimator`, `QueueProjector`, `EtaSmoother`, `EtaDisplay`; 61 unit tests (hand-computed examples); added to the 100% branch rule
+3. [x] `EtaService` (estimator choice, projection cache, per-patient hysteresis), `PredictionLog` (JOIN and position milestones, actual waits, metrics `baari.eta.abs_error.seconds` and `baari.eta.in_range`), migration `V4__eta_prediction.sql`
+4. [x] Wired in: patient token page and stream show "Your turn in about 10–15 minutes" (English and Hindi), staff console shows "Expected 10:25 (in about 12 min)" per waiting patient
+5. [x] ADR 0010; `EtaIT` (17), two new `LivePagesIT` tests, console and stream assertions
+
+## Phase 4 "Done when"
+- [x] Token page shows a range that updates as the queue moves, without jitter: `EtaIT.thePatientPageStaysCorrectWhenSomeoneAheadLeaves`, `EtaIT.theRangeDoesNotJitterAsTimePassesWithoutRealChange`, `EtaSmootherTest` (one test per rule)
+- [x] With a seeded history, Rolling is used instead of Default: `EtaIT.onceTheClinicHasTwentyFinishedConsultationsRollingIsUsedInstead` asserts the estimator name (19 consultations: DEFAULT, 20: ROLLING)
+- [x] `eta_prediction.actual_wait_s` filled correctly: `EtaIT.theActualWaitIsFilledInWhenTheConsultationStarts` (join, 12 minutes, call, start: 720 s) and `EtaIT.aPredictionThatWasRightCountsAsInRange`. This is not the `JourneysIT` J1 test itself; it is a dedicated test of the same flow.
+
+Phase 4 notes and known gaps (all in ADR 0010):
+- Not modelled yet: session start and late start, a learned transition gap (fixed 30 s), a learned no-show rate (fixed 0), the nightly calibration factor (fixed 1.0). Phase 6 backtesting decides which to add.
+- Smoothing state is in memory per instance (a patient moving between instances may briefly see a fresh range).
+- The plain REST `GET /api/public/tokens/{code}` has no ETA; only the page and the stream do.
+- The typical wait on the join page ("if you join now") was in the Phase 3 note but is not in the Phase 4 task list; not built.
+- The ETA JavaScript (token page and console) has no automated tests; the server side of the same text is tested.
 
 ## Phase 3 plan (all built, 2026-11-14)
 1. [x] Live-update plumbing: `QueueChanged` event from `EventLog`, `realtime` module (`SseHub` with coalescing, heartbeat, cleanup, gauges; `RedisFanOut`; `StreamApi`), ADR 0008
@@ -22,7 +41,7 @@ Phase 3 — UI & real-time (complete, tagged `phase-3`). Phases 1 and 2 complete
 Phase 3 notes:
 - QR image is **not** built: the user declined adding ZXing, so the poster shows the join URL as text. The TV has no QR either (rotating QR is Phase 8).
 - htmx not used (needs a vendored script); vanilla `fetch()` instead, see ADR 0008.
-- Predicted start time per waiting patient and the typical wait are Phase 4 (ETA).
+- Predicted start time per waiting patient was built in Phase 4; the typical wait on the join page was not (see Phase 4 notes).
 - Telegram alerts button on the token page is Phase 5.
 - Console, token and TV JavaScript has no automated tests; checked by hand in a browser on the dev stack (login, open day, walk-in with `<b>` in the name rendered as text, call next, start, complete, live token page in Hindi).
 
@@ -62,6 +81,11 @@ Defaults agreed at the start of Phase 2: global `baari.queue.*` settings only; r
 - Parent POM (Java 21, Boot 4.1.2, Modulith 2.1.2, Spotless, JaCoCo, Surefire/Failsafe), modules `baari-app` + `baari-simulator`, wrapper
 - App skeleton, Flyway V1, test infra (`MutableClock`, `AbstractIntegrationTest`), compose stack, CI, ADR 0001. Tagged `phase-0`, CI green.
 
+## Verified locally (2026-11-20, after Phase 4)
+- `./mvnw verify`: BUILD SUCCESS. 252 unit tests (incl. `ModularityTest`), 205 integration tests, Spotless clean, JaCoCo 100% branch rule met (now also covers the pure `eta` classes)
+- A first full run failed: `TokenServiceIT.twoHundredConcurrentJoins...` timed out at the 30 s connection-pool limit. Cause: the ETA listener wrote in a new transaction after commit, which needs a second connection while the first is held. Fixed by moving the prediction log to a background lane (ADR 0010, decision 10); a second run failed the 100% rule on one branch in `QueueProjector`, fixed; third run green
+- By hand in the browser on the dev stack (port 8081): token page showed "Your turn in about 15–25 minutes" and the console "Expected 06:02 PM (in about 7 min)" per waiting patient. Hindi and the stream text are covered by `LivePagesIT`
+
 ## Verified locally (2026-11-14, after Phase 3)
 - `./mvnw verify`: BUILD SUCCESS. 191 unit tests (incl. `ModularityTest`), 186 integration tests, Spotless clean, JaCoCo rule met
 - Phase 2: full verify green and CI green on `7f8ab16`; tagged `phase-2`
@@ -91,10 +115,10 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 **Full verify run (2026-11-14, after task 7):** BUILD SUCCESS. 184 unit tests (incl. `ModularityTest`), 160 integration tests, Spotless clean, JaCoCo rule met. **Before tagging `phase-2`:** push and check CI.
 
 ## In progress
-- Nothing. Phase 3 is finished: CI green on `cc353ad` (https://github.com/Rishi5200/Baari/actions/runs/43602796685), reconnect check done, tagged `phase-3`.
+- Phase 4 is built and verified locally. Left: check CI, tag `phase-4`.
 
 ## Next
-1. Phase 4: ETA v1 (per-doctor average, `QueueProjector`, ranges, hysteresis; fills the null ETA fields and the console's predicted start times)
+1. Phase 5: events and notifications (outbox relay to Kafka, idempotent consumers; move the ETA prediction log and history invalidation from in-process listeners to consumers)
 2. Last-admin guard (ADR 0009 item 1), small `clinic` change with an integration test; can ride along with any phase
 3. Phase 8: lock down `/actuator/prometheus`, pin Prometheus and Grafana versions (ADR 0009 items 2 and 3). Deploy blocker for Phase 9.
 
@@ -176,6 +200,7 @@ None. The four earlier questions were decided by Claude on 2026-11-20 and record
   - ADRs written: 0003 (counter row), 0004 (call-next row lock), 0005 (transactional outbox).
 
 ## Session log
+- 2026-11-20 (Phase 4) — ETA v1 in one go: queue read models, pure estimators, projector, smoother and display rounding (61 unit tests), `EtaService`, prediction log with actuals and metrics, V4 migration, token page, stream and console wiring in English and Hindi, ADR 0010, `EtaIT` (17). Next: browser check, push, CI, tag `phase-4`, then Phase 5.
 - 2026-11-20 (Phase 3 close) — CI green on `cc353ad`, reconnect check done by hand, open questions decided (ADR 0009), tagged `phase-3` on `cc353ad`. Next: Phase 4.
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
 - 2026-11-14 (Phase 3) — All Phase 3 tasks in one go: SSE hub with Redis fan-out and coalescing, patient join/token pages, staff console, TV display, poster print view, English and Hindi, ADR 0008, 33 new tests. Pushed. Next: reconnect manual check, CI, tag `phase-3`, then Phase 4.

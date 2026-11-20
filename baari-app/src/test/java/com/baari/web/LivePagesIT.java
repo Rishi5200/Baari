@@ -248,6 +248,41 @@ class LivePagesIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void tokenPageShowsTheWaitEstimateInEnglishAndHindiAndTheStreamCarriesIt() throws Exception {
+        days.open(receptionist, queueId);
+        String first = joinRedirect("Asha", "", UUID.randomUUID());
+        joinRedirect("Bina", "", UUID.randomUUID());
+        String third = joinRedirect("Chitra", "", UUID.randomUUID());
+
+        // Default estimate (6 min a patient plus a 30 s gap): the first is next, the third waits 10 to 15 min.
+        mvc.perform(get(first)).andExpect(content().string(containsString(">Your turn: in a few minutes</p>")));
+        mvc.perform(get(third)).andExpect(content().string(containsString(">Your turn in about 10–15 minutes</p>")));
+        mvc.perform(get(third).param("lang", "hi"))
+                .andExpect(content().string(containsString(">आपकी बारी लगभग 10–15 मिनट में</p>")));
+
+        String code = third.substring("/t/".length());
+        MvcResult stream = mvc.perform(
+                        get("/api/public/tokens/" + code + "/stream").accept("text/event-stream"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        assertThat(stream.getResponse().getContentAsString())
+                .contains("event:snapshot")
+                .contains("\"displayCode\":\"A-003\"")
+                .contains("\"eta\":{\"kind\":\"RANGE\",\"fromMinutes\":10,\"toMinutes\":15}");
+    }
+
+    @Test
+    void thePageHasNoEstimateOnceThePatientIsCalled() throws Exception {
+        days.open(receptionist, queueId);
+        String path = joinRedirect("Asha", "", UUID.randomUUID());
+        actions.callNext(doctor, queueId, null);
+
+        mvc.perform(get(path))
+                .andExpect(content().string(containsString("id=\"eta\" hidden")))
+                .andExpect(content().string(not(containsString(">Your turn: in a few minutes</p>"))));
+    }
+
+    @Test
     void whenCalledTheTokenPageShowsTheRoom() throws Exception {
         days.open(receptionist, queueId);
         String path = joinRedirect("Asha", "", UUID.randomUUID());
@@ -353,7 +388,11 @@ class LivePagesIT extends AbstractIntegrationTest {
                 .andExpect(request().asyncStarted())
                 .andReturn();
         String body = result.getResponse().getContentAsString();
-        assertThat(body).contains("event:snapshot").contains("Visible To Staff").contains("\"waiting\"");
+        assertThat(body)
+                .contains("event:snapshot")
+                .contains("Visible To Staff")
+                .contains("\"waiting\"")
+                .contains("\"estimates\":{\"");
 
         mvc.perform(get("/api/staff/queues/" + queueId + "/stream").with(as(otherDoctor)))
                 .andExpect(status().isNotFound());

@@ -86,6 +86,7 @@ label.check input { width: auto; margin-top: .3rem; }
 .code { font-size: 4.5rem; font-weight: 800; letter-spacing: .05em; margin: .2rem 0; text-align: center; color: var(--accent); }
 .status { font-size: 1.5rem; text-align: center; margin: 0; font-weight: 600; }
 .ahead { font-size: 1.2rem; text-align: center; }
+.eta { font-size: 1.1rem; text-align: center; font-weight: 600; }
 .serving { font-size: 1.6rem; font-weight: 700; }
 .called {
   position: fixed; inset: 0; z-index: 10; background: var(--accent); color: #fff;

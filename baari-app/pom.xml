@@ -149,6 +149,13 @@
                     <include>com.baari.queue.internal.TokenStateMachine</include>
                     <!-- the policy and its nested Settings/State/Decision records -->
                     <include>com.baari.queue.NextTokenPolicy*</include>
+                    <!-- the pure ETA algorithms (PLAN §8); the Spring parts of eta are covered by EtaIT -->
+                    <include>com.baari.eta.QueueProjector*</include>
+                    <include>com.baari.eta.EtaSmoother*</include>
+                    <include>com.baari.eta.EtaDisplay*</include>
+                    <include>com.baari.eta.RollingStatsEstimator*</include>
+                    <include>com.baari.eta.DefaultEstimator</include>
+                    <include>com.baari.eta.Distribution</include>
                   </includes>
                   <limits>
                     <limit>

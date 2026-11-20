@@ -1,6 +1,7 @@
 package com.baari.realtime;
 
 import com.baari.clinic.StaffPrincipal;
+import com.baari.eta.EtaService;
 import com.baari.queue.QueueQueryService;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
@@ -23,8 +24,10 @@ class StreamApi {
 
     private final SseHub hub;
     private final QueueQueryService queries;
+    private final EtaService eta;
 
-    StreamApi(SseHub hub, QueueQueryService queries) {
+    StreamApi(SseHub hub, QueueQueryService queries, EtaService eta) {
+        this.eta = eta;
         this.hub = hub;
         this.queries = queries;
     }
@@ -33,13 +36,13 @@ class StreamApi {
     SseEmitter patient(@PathVariable String publicCode, HttpServletResponse response) {
         noBuffering(response);
         UUID queueId = queries.queueIdOfToken(publicCode);
-        return hub.subscribe(queueId, "patient", () -> queries.publicToken(publicCode));
+        return hub.subscribe(queueId, "patient", () -> eta.patientView(publicCode));
     }
 
     @GetMapping(path = "/api/staff/queues/{queueId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     SseEmitter staff(StaffPrincipal caller, @PathVariable UUID queueId, HttpServletResponse response) {
         noBuffering(response);
-        return hub.subscribe(queueId, "staff", () -> queries.board(caller, queueId));
+        return hub.subscribe(queueId, "staff", () -> eta.staffBoard(caller, queueId));
     }
 
     @GetMapping(path = "/api/display/queues/{queueId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

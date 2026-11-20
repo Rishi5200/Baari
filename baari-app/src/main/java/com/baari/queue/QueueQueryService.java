@@ -115,6 +115,41 @@ public class QueueQueryService {
         return days.findById(token.getQueueDayId()).orElseThrow().getQueueId();
     }
 
+    /** Which token and queue a public code belongs to. An unknown code is "not found". */
+    @Transactional(readOnly = true)
+    public TokenLocator locate(String publicCode) {
+        Objects.requireNonNull(publicCode, "publicCode");
+        return tokens.findRefByPublicCode(publicCode)
+                .map(ref -> new TokenLocator(ref.tokenId(), ref.queueId(), ref.clinicId()))
+                .orElseThrow(() -> new NotFoundException("Token"));
+    }
+
+    /**
+     * Today's state of a queue for the ETA module, or empty if today's day was never opened. No
+     * caller check: callers (the {@code eta} module) get here only after their own checks.
+     */
+    @Transactional(readOnly = true)
+    public Optional<QueueLiveState> liveState(UUID queueId) {
+        QueueInfo info = directory.find(queueId).orElseThrow(() -> new NotFoundException("Queue"));
+        return today(info)
+                .map(day -> new QueueLiveState(
+                        day.getClinicId(),
+                        queueId,
+                        day.getId(),
+                        day.getStatus(),
+                        day.toView().lastEventSeq(),
+                        new NextTokenPolicy.State(day.getConsecutivePriorityServed()),
+                        settings.policySettings(),
+                        tokens.findByQueueDayIdOrderByNumberAsc(day.getId()).stream()
+                                .map(t -> new QueueLiveState.LiveToken(
+                                        t.toTokenView(),
+                                        t.getVisitType(),
+                                        t.getCalledAt(),
+                                        t.getConsultStartedAt(),
+                                        t.getServedByDoctorId()))
+                                .toList()));
+    }
+
     /**
      * The TV board. Open to anyone holding the queue's display key; a wrong key and an unknown
      * queue both answer "not found" so the screen's URL can't be used to probe ids.
