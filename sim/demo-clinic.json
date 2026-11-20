@@ -1,0 +1,21 @@
+{
+  "clinic": "Demo Clinic",
+  "zone": "Asia/Kolkata",
+  "sessions": [
+    { "start": "09:30", "end": "13:30" },
+    { "start": "17:00", "end": "20:00" }
+  ],
+  "doctors": [
+    { "name": "Dr Rao", "medianNewS": 420, "medianFollowUpS": 240, "sigma": 0.45, "arrivalShare": 0.6 },
+    { "name": "Dr Iyer", "medianNewS": 540, "medianFollowUpS": 300, "sigma": 0.5, "arrivalShare": 0.4 }
+  ],
+  "hourEffect": { "9": 0.9, "10": 1.0, "11": 1.05, "12": 1.1, "13": 1.15, "17": 1.0, "18": 1.05, "19": 1.1 },
+  "fatiguePerPatient": 0.004,
+  "lateStartMeanMin": 8,
+  "arrivalsPerHour": { "9": 14, "10": 20, "11": 22, "12": 18, "13": 10, "17": 18, "18": 20, "19": 12 },
+  "newVisitShare": 0.4,
+  "priorityShare": 0.12,
+  "emergencyShare": 0.01,
+  "noShowProbability": 0.06,
+  "qrShare": 0.7
+}

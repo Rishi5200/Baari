@@ -119,6 +119,10 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 - Full `./mvnw verify` green (215 integration tests, Spotless, JaCoCo). Tests: Kafka listeners are off by default (`src/test/resources/application.properties`); EtaIT, NotificationIT and OutboxRelayIT turn them on with their own `baari.events.group-prefix`, because cached contexts would otherwise share consumer groups.
 - Not done: TelegramChannel with link and webhook (user will supply the bot later), a language per token (messages are English only; Hindi texts exist), the manual Telegram check on a real phone, a full `./mvnw verify`, CI, tag `phase-5`.
 
+## Phase 6 (started 2026-11-20)
+- [x] `baari-simulator`: discrete-event `DaySimulation` (per doctor and session, lognormal service times, hour and fatigue effects, late start, Poisson arrivals by hour, no-shows, same next-patient rules as the queue), hand-written `Json` reader (no new dependency), `generate` command writing `tokens.csv`, `sim/demo-clinic.json`. `SimulatorTest` (9) covers determinism by seed. 60 demo days: about 121 patients a day, median wait 31 min, p90 93 min.
+- [ ] Import the CSV into the demo clinic, `backtest` command, `docs/eta-evaluation.md` (Default vs Rolling by trigger), optional `drive`.
+
 ## Next
 1. Finish Phase 5: Telegram channel, full verify, CI, tag. (Rolling statistics stay Postgres-backed with a one-minute cache, so no RollingStatsUpdater; see ADR 0011.)
 2. Last-admin guard (ADR 0009 item 1), small `clinic` change with an integration test; can ride along with any phase
