@@ -3,7 +3,7 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 3 — UI & real-time (built, one manual check left). Phases 1 and 2 complete, tagged `phase-1`, `phase-2`.
+Phase 3 — UI & real-time (complete, tagged `phase-3`). Phases 1 and 2 complete, tagged `phase-1`, `phase-2`. Next: Phase 4.
 
 ## Phase 3 plan (all built, 2026-11-14)
 1. [x] Live-update plumbing: `QueueChanged` event from `EventLog`, `realtime` module (`SseHub` with coalescing, heartbeat, cleanup, gauges; `RedisFanOut`; `StreamApi`), ADR 0008
@@ -16,7 +16,7 @@ Phase 3 — UI & real-time (built, one manual check left). Phases 1 and 2 comple
 ## Phase 3 "Done when"
 - [x] Patient page updates within 1 s of staff clicking "Call next": `StreamIT` asserts under 1000 ms (typically ~250 ms); real browsers measured about 470 ms click to update (2026-11-14)
 - [x] Cross-instance SSE test passes: `StreamIT.aMessageFromAnotherInstanceReachesThisInstancesStream` (publishes straight to Redis, as a second instance would)
-- [ ] Killing the network and reconnecting restores the correct state: **manual check, not done yet.** How: open a token page, turn off Wi-Fi or use DevTools "Offline" (banner "Connection lost" appears), call that token from the console, go back online; the page should show the new state within seconds (the stream sends a full snapshot on reconnect, and `online` / tab-visible events force a reconnect).
+- [x] Killing the network and reconnecting restores the correct state (checked by hand 2026-11-20 on the dev stack, port 8081). The built-in browser has no offline switch, so the drop was simulated: closed the live `EventSource` and fired its error handler. The "Connection lost" banner showed, the token was called from the console (A-001 became CALLED), and about 5 s later the page reconnected itself, showed "It is your turn" and hid the banner. This exercises the CLOSED-then-retry path. The browser's own back-off and the `online` event path were not exercised by a real network cut.
 - [x] TV display shows no patient names: `StreamIT.displayStreamNeedsTheKeyAndShowsNoNames`, `LivePagesIT.displayPageNeedsTheKeyAndShowsNoPatientNames`
 
 Phase 3 notes:
@@ -91,17 +91,15 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 **Full verify run (2026-11-14, after task 7):** BUILD SUCCESS. 184 unit tests (incl. `ModularityTest`), 160 integration tests, Spotless clean, JaCoCo rule met. **Before tagging `phase-2`:** push and check CI.
 
 ## In progress
-- Nothing. Phase 3 is built and verified; waiting on CI and the offline/reconnect manual check.
+- Nothing. Phase 3 is finished: CI green on `cc353ad` (https://github.com/Rishi5200/Baari/actions/runs/43602796685), reconnect check done, tagged `phase-3`.
 
 ## Next
-1. Run the reconnect check above, check CI, tag `phase-3`
-2. Phase 4: ETA v1 (per-doctor average, `QueueProjector`, ranges, hysteresis; fills the null ETA fields and the console's predicted start times)
+1. Phase 4: ETA v1 (per-doctor average, `QueueProjector`, ranges, hysteresis; fills the null ETA fields and the console's predicted start times)
+2. Last-admin guard (ADR 0009 item 1), small `clinic` change with an integration test; can ride along with any phase
+3. Phase 8: lock down `/actuator/prometheus`, pin Prometheus and Grafana versions (ADR 0009 items 2 and 3). Deploy blocker for Phase 9.
 
 ## Open questions for the user
-- Nothing stops a clinic admin from disabling or demoting their own account (could leave a clinic with no admin). Add a guard?
-- Port 8080 on this machine is held by an unrelated process (`AgentService`), so run locally with `--server.port=8081`.
-- `/actuator/prometheus` is public for local scraping; lock down in Phase 8.
-- Prometheus and Grafana images use `:latest`; pin versions in Phase 8?
+None. The four earlier questions were decided by Claude on 2026-11-20 and recorded in `docs/adr/0009-open-questions-resolved-after-phase-3.md`; the user can overrule them. Port 8080 on this machine is held by an unrelated process, so run locally with `--server.port=8081`.
 
 ## Notes / decisions
 - `Ids.newId()` uses random UUIDs, not UUIDv7: UUIDv7 needs the current time and the only allowed time source is an injected `Clock`.
@@ -178,6 +176,7 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
   - ADRs written: 0003 (counter row), 0004 (call-next row lock), 0005 (transactional outbox).
 
 ## Session log
+- 2026-11-20 (Phase 3 close) — CI green on `cc353ad`, reconnect check done by hand, open questions decided (ADR 0009), tagged `phase-3` on `cc353ad`. Next: Phase 4.
 <!-- newest first: YYYY-MM-DD — what was done, what's next -->
 - 2026-11-14 (Phase 3) — All Phase 3 tasks in one go: SSE hub with Redis fan-out and coalescing, patient join/token pages, staff console, TV display, poster print view, English and Hindi, ADR 0008, 33 new tests. Pushed. Next: reconnect manual check, CI, tag `phase-3`, then Phase 4.
 - 2026-11-14 (Phase 2) — Task 7: public and staff REST APIs, `QueueQueryService` (join page, token page, board), API security rules, journeys J1–J7 and an API security/error matrix (20 integration tests), ADRs 0003–0005. Unit tests not run (user's request). Next: full verify with unit tests, push, CI, tag `phase-2`.
