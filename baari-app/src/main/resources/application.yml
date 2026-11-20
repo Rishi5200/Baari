@@ -46,6 +46,10 @@ baari:
     recall-insert-offset: 2
     max-consecutive-priority: 2
     max-open-tokens: 300
+  notifications: # PLAN §14
+    notify-ahead-count: 3 # told to come back when at position 3 or better
+    log-enabled: true # the log channel; the real channels need their own settings
+    max-attempts: 5
   privacy:
     # Required outside dev/test; empty here so startup fails with a clear message if unset.
     data-key: ${BAARI_DATA_KEY:}         # base64 of 32 random bytes (AES-256)

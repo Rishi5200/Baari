@@ -108,6 +108,25 @@ public class EtaService {
         return new StaffBoardView(board, estimates);
     }
 
+    /** The place in line of every waiting patient of a queue today (1 = next). Empty if the day is closed. */
+    public Map<UUID, TokenEstimate> estimates(UUID queueId) {
+        Map<UUID, TokenEstimate> result = new HashMap<>();
+        projectQueue(queueId)
+                .ifPresent(p -> p.byToken()
+                        .forEach((tokenId, projection) -> result.put(
+                                tokenId,
+                                new TokenEstimate(
+                                        projection.position(),
+                                        projection.expectedStartAt(),
+                                        projection.waitSeconds()))));
+        return result;
+    }
+
+    /** The wait as a patient would read it on the token page (same smoothing), or empty if not waiting. */
+    public Optional<EtaDisplay> displayOf(UUID queueId, UUID tokenId) {
+        return displayFor(queueId, tokenId);
+    }
+
     /**
      * The raw projection of a queue's waiting patients, or empty if today's day was never opened.
      * Closed days have none, and neither do queues with no doctor serving.

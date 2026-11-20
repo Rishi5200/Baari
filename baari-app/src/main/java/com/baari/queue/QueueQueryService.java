@@ -124,6 +124,37 @@ public class QueueQueryService {
                 .orElseThrow(() -> new NotFoundException("Token"));
     }
 
+    /** The queue a queue day belongs to (events carry the day id only). */
+    @Transactional(readOnly = true)
+    public Optional<UUID> queueIdOfDay(UUID queueDayId) {
+        return days.findById(queueDayId).map(QueueDayEntity::getQueueId);
+    }
+
+    /** Tokens that were open when the day closed. Used to tell patients the queue has closed. */
+    @Transactional(readOnly = true)
+    public List<UUID> expiredTokenIds(UUID queueDayId) {
+        return tokens
+                .findByQueueDayIdAndStatusInOrderBySortKeyAscNumberAsc(queueDayId, EnumSet.of(TokenStatus.EXPIRED))
+                .stream()
+                .map(TokenEntity::getId)
+                .toList();
+    }
+
+    /** A token's place and state for a notification, or empty if it no longer exists. */
+    @Transactional(readOnly = true)
+    public Optional<TokenAlertView> alertView(UUID tokenId) {
+        return tokens.findById(tokenId)
+                .flatMap(token -> days.findById(token.getQueueDayId())
+                        .flatMap(day -> directory
+                                .find(day.getQueueId())
+                                .map(info -> new TokenAlertView(
+                                        token.getId(),
+                                        day.getQueueId(),
+                                        day.getId(),
+                                        new DisplayCode(info.queue().displayCodePrefix(), token.getNumber()).toString(),
+                                        token.getStatus()))));
+    }
+
     /**
      * Today's state of a queue for the ETA module, or empty if today's day was never opened. No
      * caller check: callers (the {@code eta} module) get here only after their own checks.
