@@ -121,7 +121,8 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 
 ## Phase 6 (started 2026-11-20)
 - [x] `baari-simulator`: discrete-event `DaySimulation` (per doctor and session, lognormal service times, hour and fatigue effects, late start, Poisson arrivals by hour, no-shows, same next-patient rules as the queue), hand-written `Json` reader (no new dependency), `generate` command writing `tokens.csv`, `sim/demo-clinic.json`. `SimulatorTest` (9) covers determinism by seed. 60 demo days: about 121 patients a day, median wait 31 min, p90 93 min.
-- [ ] Import the CSV into the demo clinic, `backtest` command, `docs/eta-evaluation.md` (Default vs Rolling by trigger), optional `drive`.
+- [x] `com.baari.eta.Backtest` (pure, no Spring): `java -cp baari-app/target/classes com.baari.eta.Backtest --tokens build/sim/tokens.csv --out docs/eta-evaluation.md`. Replays the newest 14 of 60 days through the real `QueueProjector` at the production triggers; Rolling only sees earlier days. `BacktestTest` (4). Result: Rolling MAE 7.4 min vs Default 8.6 (13% lower), but both cover only about 45% against the 60% target and lean short. Gaps: late start, fatigue, no-show allowance, calibration. Full verify green (215 ITs + 9 simulator tests).
+- [ ] Import the CSV into the demo clinic (psql script), optional `drive`, fix the range coverage.
 
 ## Next
 1. Finish Phase 5: Telegram channel, full verify, CI, tag. (Rolling statistics stay Postgres-backed with a one-minute cache, so no RollingStatsUpdater; see ADR 0011.)

@@ -15,7 +15,7 @@ import java.util.Random;
  */
 final class DaySimulation {
 
-    static final int MAX_PRIORITY_IN_ROW = 3;
+    static final int MAX_PRIORITY_IN_ROW = 2;
     private static final long NO_SHOW_GRACE_S = 180;
     private static final long TRANSITION_GAP_S = 30;
     /** A few patients are already waiting when the doctor starts. */
@@ -183,21 +183,21 @@ final class DaySimulation {
     private Patient pickNext() {
         for (Patient p : line) {
             if (p.priority.equals("EMERGENCY")) {
-                priorityInRow = 0;
-                return p;
+                return p; // an emergency leaves the priority counter alone, as NextTokenPolicy does
             }
         }
-        boolean allowPriority = priorityInRow < MAX_PRIORITY_IN_ROW;
-        Patient chosen = null;
+        Patient firstPriority = null;
+        Patient firstNormal = null;
         for (Patient p : line) {
-            if (allowPriority || p.priority.equals("NORMAL")) {
-                chosen = p;
-                break;
+            if (firstPriority == null && p.priority.equals("PRIORITY")) {
+                firstPriority = p;
+            }
+            if (firstNormal == null && p.priority.equals("NORMAL")) {
+                firstNormal = p;
             }
         }
-        if (chosen == null) {
-            chosen = line.get(0); // only priority patients are left, so the cap does not apply
-        }
+        boolean priorityTurn = firstNormal == null || priorityInRow < MAX_PRIORITY_IN_ROW;
+        Patient chosen = firstPriority != null && priorityTurn ? firstPriority : firstNormal;
         priorityInRow = chosen.priority.equals("PRIORITY") ? priorityInRow + 1 : 0;
         return chosen;
     }
