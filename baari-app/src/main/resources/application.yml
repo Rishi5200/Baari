@@ -20,6 +20,19 @@ spring:
       port: 6379
   kafka:
     bootstrap-servers: ${BAARI_KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      # A new consumer group must read the topic from its start, or events sent before it first
+      # joined would be lost.
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        # Fail a send quickly when Kafka is away: the outbox keeps the row and the relay retries.
+        max.block.ms: 5000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
   session:
     timeout: 12h # idle timeout for staff sessions (PLAN §9.1)
     data:

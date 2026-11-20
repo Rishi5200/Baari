@@ -28,7 +28,7 @@ public abstract class AbstractIntegrationTest {
     static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7").withExposedPorts(6379);
 
     @ServiceConnection
-    static final KafkaContainer KAFKA = new KafkaContainer("apache/kafka:4.0.0");
+    protected static final KafkaContainer KAFKA = new KafkaContainer("apache/kafka:4.0.0");
 
     static {
         Startables.deepStart(POSTGRES, REDIS, KAFKA).join();
