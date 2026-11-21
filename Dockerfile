@@ -5,7 +5,7 @@
 #   docker build --target driver -t baari-driver .     the demo activity driver (simulator "drive")
 
 # ---- build ----------------------------------------------------------------------------------
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:24-jdk AS build
 WORKDIR /src
 
 # Dependencies first: this layer is cached until a pom changes.
@@ -25,7 +25,7 @@ RUN ./mvnw -B -ntp -q package -DskipTests -Djacoco.skip=true \
     && java -Djarmode=tools -jar app.jar extract --layers --launcher --destination extracted
 
 # ---- demo driver ------------------------------------------------------------------------------
-FROM eclipse-temurin:21-jre AS driver
+FROM eclipse-temurin:24-jre AS driver
 RUN groupadd --system baari && useradd --system --gid baari --no-create-home baari
 WORKDIR /driver
 COPY --from=build /src/simulator.jar ./
@@ -34,7 +34,7 @@ USER baari
 ENTRYPOINT ["java", "-cp", "simulator.jar", "com.baari.simulator.SimulatorMain", "drive", "--config", "demo-clinic.json"]
 
 # ---- app (default) --------------------------------------------------------------------------
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:24-jre
 RUN groupadd --system baari && useradd --system --gid baari --no-create-home baari
 WORKDIR /app
 COPY --from=build /src/extracted/dependencies/ ./
