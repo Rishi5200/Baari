@@ -259,12 +259,22 @@ public class EtaService {
             List<LiveToken> consults = inConsultation.stream()
                     .filter(t -> doctorId.equals(t.servedByDoctorId()))
                     .toList();
+            // the doctor's session so far, from every consultation of theirs that started today (ML features)
+            Sessions.SoFar session = Sessions.soFar(
+                    state.tokens().stream()
+                            .filter(t -> doctorId.equals(t.servedByDoctorId()) && t.consultStartedAt() != null)
+                            .map(LiveToken::consultStartedAt)
+                            .sorted()
+                            .toList(),
+                    now);
             if (consults.isEmpty()) {
-                servers.add(new QueueProjector.Server(doctorId, null));
+                servers.add(new QueueProjector.Server(doctorId, null, session));
             }
             for (LiveToken t : consults) {
                 servers.add(new QueueProjector.Server(
-                        doctorId, new QueueProjector.Consult(t.view().id(), t.visitType(), t.consultStartedAt())));
+                        doctorId,
+                        new QueueProjector.Consult(t.view().id(), t.visitType(), t.consultStartedAt()),
+                        session));
             }
         }
 

@@ -376,10 +376,13 @@ class QueueProjectorTest {
         QueueProjector.project(in, stub(new Distribution(1800, 1800, 1800), seen), NO_GAP);
 
         // 04:00 UTC is 09:30 in Kolkata. Patient 1 starts then (hour 9), patient 2 half an hour later (10:00).
+        // The doctor has seen nobody yet, so patient 1 opens the session and patient 2 is second in it,
+        // 30 minutes in; one patient is still waiting when patient 1 goes in, none when patient 2 does.
+        java.time.DayOfWeek day = NOW.atZone(KOLKATA).getDayOfWeek();
         assertThat(seen)
                 .containsExactly(
-                        new ServiceContext(DOCTOR_A, VisitType.FOLLOW_UP, 9),
-                        new ServiceContext(DOCTOR_A, VisitType.NEW, 10));
+                        new ServiceContext(DOCTOR_A, VisitType.FOLLOW_UP, 9, Priority.NORMAL, day, 1, 0, 1),
+                        new ServiceContext(DOCTOR_A, VisitType.NEW, 10, Priority.NORMAL, day, 2, 30, 0));
     }
 
     @Test
@@ -390,7 +393,11 @@ class QueueProjectorTest {
                 stub(new Distribution(300, 300, 300), seen),
                 NO_GAP);
 
-        assertThat(seen).containsExactly(new ServiceContext(DOCTOR_A, VisitType.NEW, 9));
+        assertThat(seen).singleElement().satisfies(ctx -> {
+            assertThat(ctx.doctorId()).isEqualTo(DOCTOR_A);
+            assertThat(ctx.visitType()).isEqualTo(VisitType.NEW);
+            assertThat(ctx.hourOfDay()).isEqualTo(9);
+        });
     }
 
     // --- parameters ---
@@ -401,5 +408,27 @@ class QueueProjectorTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new Params(0, -0.1, 1));
         assertThatIllegalArgumentException().isThrownBy(() -> new Params(0, 1, 1));
         assertThatIllegalArgumentException().isThrownBy(() -> new Params(0, 0, 0));
+    }
+
+    @Test
+    void aDoctorAlreadyInSessionContinuesItsCountAndAPriorityPatientIsDescribedAsSuch() {
+        List<ServiceContext> seen = new ArrayList<>();
+        // the doctor started the session 40 minutes ago and has seen 3 patients, the 4th is inside now
+        Instant sessionStart = NOW.minus(java.time.Duration.ofMinutes(40));
+        Instant currentStart = NOW.minus(java.time.Duration.ofMinutes(2));
+        Sessions.SoFar session = new Sessions.SoFar(4, sessionStart, currentStart);
+        Server busy =
+                new Server(DOCTOR_A, new QueueProjector.Consult(new UUID(9, 9), VisitType.NEW, currentStart), session);
+        QueueProjector.project(
+                input(List.of(busy), List.of(), waiting(1, Priority.PRIORITY)),
+                stub(new Distribution(300, 300, 300), seen),
+                NO_GAP);
+
+        assertThat(seen).hasSize(2);
+        assertThat(seen.get(0).positionInSession()).as("the patient inside").isEqualTo(4);
+        assertThat(seen.get(0).minutesIntoSession()).isEqualTo(38);
+        assertThat(seen.get(1).positionInSession()).as("the next patient").isEqualTo(5);
+        assertThat(seen.get(1).priority()).isEqualTo(Priority.PRIORITY);
+        assertThat(seen.get(1).queueLength()).isZero();
     }
 }

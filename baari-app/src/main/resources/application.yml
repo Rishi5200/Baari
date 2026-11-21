@@ -50,10 +50,17 @@ baari:
     notify-ahead-count: 3 # told to come back when at position 3 or better
     log-enabled: true # the log channel; the real channels need their own settings
     max-attempts: 5
+  ml: # PLAN §8.6, §14
+    min-training-samples: 300 # finished consultations a clinic needs before a model is trained
+    train-hour: 2 # nightly training at 02:30 clinic time
   privacy:
     # Required outside dev/test; empty here so startup fails with a clear message if unset.
     data-key: ${BAARI_DATA_KEY:}         # base64 of 32 random bytes (AES-256)
     phone-pepper: ${BAARI_PHONE_PEPPER:} # base64 of at least 32 random bytes (HMAC)
+
+logging:
+  level:
+    org.tribuo: WARN # Tribuo logs every 1000 training steps at INFO
 
 server:
   # Behind Caddy: use X-Forwarded-* so generated links (poster) carry the public https host.

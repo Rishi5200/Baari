@@ -1,6 +1,7 @@
 package com.baari.eta;
 
 import com.baari.queue.NextTokenPolicy;
+import com.baari.queue.Priority;
 import com.baari.queue.QueueSnapshot;
 import com.baari.queue.TokenView;
 import com.baari.queue.VisitType;
@@ -37,8 +38,24 @@ public final class QueueProjector {
     /** A consultation in progress. */
     public record Consult(UUID tokenId, VisitType visitType, Instant startedAt) {}
 
-    /** One doctor (room) serving this queue today; {@code current} is null when they are free. */
-    public record Server(UUID doctorId, Consult current) {}
+    /**
+     * One doctor (room) serving this queue today; {@code current} is null when they are free.
+     *
+     * @param session the doctor's session so far, counting {@code current} if there is one
+     */
+    public record Server(UUID doctorId, Consult current, Sessions.SoFar session) {
+        public Server {
+            Objects.requireNonNull(session, "session");
+        }
+
+        /** A server whose earlier consultations are unknown: the current one (if any) opens the session. */
+        public Server(UUID doctorId, Consult current) {
+            this(
+                    doctorId,
+                    current,
+                    current == null ? Sessions.SoFar.NONE : Sessions.SoFar.NONE.next(current.startedAt()));
+        }
+    }
 
     /** A token that has been called but whose consultation has not started yet. */
     public record Called(UUID tokenId, VisitType visitType, Instant calledAt, UUID doctorId) {}
@@ -103,9 +120,11 @@ public final class QueueProjector {
         final UUID doctorId;
         double freeAtS;
         double varianceS2;
+        Sessions.SoFar session;
 
-        Lane(UUID doctorId) {
+        Lane(UUID doctorId, Sessions.SoFar session) {
             this.doctorId = doctorId;
+            this.session = session;
         }
     }
 
@@ -114,13 +133,20 @@ public final class QueueProjector {
         if (in.servers().isEmpty()) {
             return List.of();
         }
+        List<TokenView> order = NextTokenPolicy.projectOrder(in.snapshot(), in.policyState(), in.policySettings());
         List<Lane> lanes = new ArrayList<>();
         for (Server server : in.servers()) {
-            Lane lane = new Lane(server.doctorId());
+            Lane lane = new Lane(server.doctorId(), server.session());
             Consult current = server.current();
             if (current != null) {
-                Distribution d = estimator.estimate(
-                        context(server.doctorId(), current.visitType(), in.zone(), current.startedAt()));
+                Distribution d = estimator.estimate(context(
+                        server.doctorId(),
+                        current.visitType(),
+                        Priority.NORMAL,
+                        in.zone(),
+                        current.startedAt(),
+                        server.session(),
+                        order.size() + in.called().size()));
                 double elapsed = Math.max(0, secondsBetween(current.startedAt(), in.now()));
                 lane.freeAtS = Math.max(d.meanS() - elapsed, MIN_REMAINING_SHARE * d.meanS());
                 lane.varianceS2 = d.sdS() * d.sdS();
@@ -132,13 +158,13 @@ public final class QueueProjector {
         List<Called> called = in.called().stream()
                 .sorted(Comparator.comparing(Called::calledAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
-        for (Called c : called) {
+        for (int i = 0; i < called.size(); i++) {
+            Called c = called.get(i);
             Lane lane = laneFor(lanes, c.doctorId());
-            occupy(lane, estimator, in, c.visitType(), params);
+            occupy(lane, estimator, in, c.visitType(), Priority.NORMAL, order.size() + called.size() - i - 1, params);
         }
 
         List<Projection> projections = new ArrayList<>();
-        List<TokenView> order = NextTokenPolicy.projectOrder(in.snapshot(), in.policyState(), in.policySettings());
         for (int i = 0; i < order.size(); i++) {
             TokenView token = order.get(i);
             Lane lane = earliest(lanes);
@@ -152,15 +178,28 @@ public final class QueueProjector {
                     (int) Math.round(Math.max(0, start - half)),
                     (int) Math.round(start + half)));
             VisitType visit = in.visitTypes().getOrDefault(token.id(), VisitType.NEW);
-            occupy(lane, estimator, in, visit, params);
+            occupy(lane, estimator, in, visit, token.priority(), order.size() - i - 1, params);
         }
         return List.copyOf(projections);
     }
 
-    /** Books the lane for one more consultation: the gap, then the expected time if they turn up. */
-    private static void occupy(Lane lane, ServiceTimeEstimator estimator, Input in, VisitType visit, Params params) {
+    /**
+     * Books the lane for one more consultation: the gap, then the expected time if they turn up.
+     *
+     * @param waitingAfter patients still waiting once this one goes in
+     */
+    private static void occupy(
+            Lane lane,
+            ServiceTimeEstimator estimator,
+            Input in,
+            VisitType visit,
+            Priority priority,
+            int waitingAfter,
+            Params params) {
         Instant start = in.now().plusMillis(Math.round(lane.freeAtS * 1000));
-        Distribution d = estimator.estimate(context(lane.doctorId, visit, in.zone(), start));
+        lane.session = lane.session.next(start);
+        Distribution d = estimator.estimate(
+                context(lane.doctorId, visit, priority, in.zone(), start, lane.session, waitingAfter));
         lane.freeAtS += params.transitionGapSeconds() + (1 - params.noShowRate()) * d.meanS();
         lane.varianceS2 += d.sdS() * d.sdS();
     }
@@ -184,8 +223,25 @@ public final class QueueProjector {
         return best;
     }
 
-    private static ServiceContext context(UUID doctorId, VisitType visit, ZoneId zone, Instant at) {
-        return new ServiceContext(doctorId, visit, at.atZone(zone).getHour());
+    /** The context of a consultation starting at {@code at}; {@code session} already counts it. */
+    private static ServiceContext context(
+            UUID doctorId,
+            VisitType visit,
+            Priority priority,
+            ZoneId zone,
+            Instant at,
+            Sessions.SoFar session,
+            int queueLength) {
+        var local = at.atZone(zone);
+        return new ServiceContext(
+                doctorId,
+                visit,
+                local.getHour(),
+                priority,
+                local.getDayOfWeek(),
+                Math.max(1, session.started()),
+                session.minutesInto(at),
+                Math.max(0, queueLength));
     }
 
     private static double secondsBetween(Instant from, Instant to) {

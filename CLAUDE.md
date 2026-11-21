@@ -142,8 +142,8 @@ docker compose -f ops/docker-compose.yml up -d
 # load it into the dev database (demo clinic must exist: run the app once with the dev profile)
 psql "postgresql://baari:baari@localhost:5432/baari" -v csv=build/sim/tokens.csv -f sim/import-history.psql
 
-# backtest: Default vs Rolling vs calibrated Rolling, writes docs/eta-evaluation.md
-./mvnw -pl baari-app compile && java -cp baari-app/target/classes com.baari.eta.Backtest --tokens build/sim/tokens.csv --out docs/eta-evaluation.md
+# backtest: Default, Rolling, calibrated Rolling and the ML candidates; writes docs/eta-evaluation.md
+./mvnw -pl baari-app compile exec:java -Dexec.args="--tokens build/sim/tokens.csv --out docs/eta-evaluation.md"
 
 # load test
 k6 run load/join-and-poll.js

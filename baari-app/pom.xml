@@ -19,6 +19,17 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc</artifactId>
     </dependency>
+    <!-- ML wait-time model (PLAN 8.6, CLAUDE.md stack): linear SGD and CART regression -->
+    <dependency>
+      <groupId>org.tribuo</groupId>
+      <artifactId>tribuo-regression-sgd</artifactId>
+      <version>${tribuo.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.tribuo</groupId>
+      <artifactId>tribuo-regression-tree</artifactId>
+      <version>${tribuo.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
@@ -127,6 +138,15 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!-- runs the backtest (com.baari.eta.Backtest) with the app's classpath: mvn -pl baari-app exec:java -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.7.0</version>
+        <configuration>
+          <mainClass>com.baari.eta.Backtest</mainClass>
+        </configuration>
       </plugin>
 
       <!-- PLAN §12 Phase 2: the pure queue algorithms must keep 100% branch coverage.

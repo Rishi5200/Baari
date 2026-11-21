@@ -3,8 +3,8 @@ package com.baari.eta;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.baari.eta.Backtest.Observation;
 import com.baari.eta.Backtest.Row;
+import com.baari.eta.WaitReplay.Observation;
 import com.baari.queue.Priority;
 import com.baari.queue.VisitType;
 import java.time.Instant;
@@ -64,7 +64,7 @@ class BacktestTest {
     private static Observation find(List<Observation> obs, String estimator, String trigger, int predicted) {
         return obs.stream()
                 .filter(o ->
-                        o.estimator().equals(estimator) && o.trigger().equals(trigger) && o.predictedS() == predicted)
+                        o.variant().equals(estimator) && o.trigger().equals(trigger) && o.predictedS() == predicted)
                 .findFirst()
                 .orElseThrow(
                         () -> new AssertionError(estimator + " " + trigger + " " + predicted + " not found in " + obs));
@@ -99,7 +99,7 @@ class BacktestTest {
         assertThat(find(obs, "ROLLING", "JOIN", 510).actualS()).isEqualTo(540);
         assertThat(obs.stream()
                         .filter(o ->
-                                o.estimator().equals("ROLLING") && o.trigger().equals("JOIN")))
+                                o.variant().equals("ROLLING") && o.trigger().equals("JOIN")))
                 .noneMatch(o -> o.predictedS() == 270);
     }
 
@@ -128,7 +128,7 @@ class BacktestTest {
                 new Observation("X", "JOIN", 600, 500, 700, 660), // -1 min, covered
                 new Observation("X", "JOIN", 600, 500, 700, 900), // -5 min, not covered
                 new Observation("X", "JOIN", 600, 500, 700, 480)); // +2 min, not covered
-        Backtest.Stats s = Backtest.stats(obs);
+        WaitReplay.Stats s = WaitReplay.stats(obs);
         assertThat(s.n()).isEqualTo(3);
         assertThat(s.maeMin()).isCloseTo((1 + 5 + 2) / 3.0, org.assertj.core.data.Offset.offset(1e-9));
         assertThat(s.biasMin()).isCloseTo((-1 - 5 + 2) / 3.0, org.assertj.core.data.Offset.offset(1e-9));
