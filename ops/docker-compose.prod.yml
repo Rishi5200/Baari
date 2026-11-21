@@ -55,7 +55,7 @@ services:
         condition: service_healthy
 
   caddy:
-    image: caddy:2.10.2
+    image: caddy:2.11.9
     restart: unless-stopped
     ports:
       - "80:80"
@@ -95,7 +95,7 @@ services:
       retries: 10
 
   kafka:
-    image: apache/kafka:4.0.0
+    image: apache/kafka:4.3.1
     restart: unless-stopped
     environment:
       KAFKA_NODE_ID: 1
