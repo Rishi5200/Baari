@@ -162,7 +162,7 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 - [x] README: problem, architecture (Mermaid), decisions with ADR links, ETA accuracy table, concurrency guarantees with test names, 3-command local run, deploy steps, stack, future work.
 - [ ] Public URL over HTTPS with the demo clinic and driver: needs a VM + domain (user). Steps are in the README "Deploying" section; on a real server create the clinic and a receptionist through the admin pages (the dev profile must not be used there).
 - [ ] README demo GIF and live link: after the deploy.
-- [ ] "A stranger can run it locally with 3 commands": the commands work here; CI's `prod-stack` job runs the same command on a clean machine (confirm on the first green run).
+- [x] "A stranger can run it locally with 3 commands": works here, and CI's `prod-stack` job ran the same compose command on a clean GitHub runner, green on the first run (commit 445e1b5): stack healthy, fan-out check, smoke checks, backup.
 
 ## Next
 1. Phase 9 — public deploy: needs a VM and a domain from the user; then README GIF and live link, tag `phase-9`.
