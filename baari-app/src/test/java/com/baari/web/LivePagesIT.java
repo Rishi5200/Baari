@@ -181,10 +181,31 @@ class LivePagesIT extends AbstractIntegrationTest {
 
         mvc.perform(post(joinUrl())
                         .param("name", "No Consent")
-                        .param("idempotencyKey", UUID.randomUUID().toString()))
+                        .param("idempotencyKey", UUID.randomUUID().toString())
+                        .param("startedAt", filledInSecondsAgo(5)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("tick the box")))
                 .andExpect(content().string(containsString("value=\"No Consent\"")));
+
+        assertThat(queries.publicQueue(clinic.slug(), queueSlug).waiting()).isZero();
+    }
+
+    @Test
+    void aFilledHoneypotOrAFormSentTooFastIsTreatedAsABotAndCreatesNothing() throws Exception {
+        days.open(receptionist, queueId);
+
+        mvc.perform(joinRequest("Bot", "", UUID.randomUUID()).param("website", "http://spam.example"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("send it again")));
+        mvc.perform(joinRequest("Fast", "", UUID.randomUUID(), filledInSecondsAgo(0)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("send it again")));
+        mvc.perform(post(joinUrl())
+                        .param("name", "No Timestamp")
+                        .param("consent", "on")
+                        .param("idempotencyKey", UUID.randomUUID().toString()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("send it again")));
 
         assertThat(queries.publicQueue(clinic.slug(), queueSlug).waiting()).isZero();
     }
@@ -450,12 +471,23 @@ class LivePagesIT extends AbstractIntegrationTest {
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder joinRequest(
             String name, String phone, UUID key) {
+        return joinRequest(name, phone, key, filledInSecondsAgo(5));
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder joinRequest(
+            String name, String phone, UUID key, String startedAt) {
         return post(joinUrl())
                 .param("name", name)
                 .param("phone", phone)
                 .param("visitType", "NEW")
                 .param("consent", "on")
-                .param("idempotencyKey", key.toString());
+                .param("idempotencyKey", key.toString())
+                .param("startedAt", startedAt);
+    }
+
+    /** The join form's render time, as a person who took this long to fill it in would send it. */
+    private static String filledInSecondsAgo(int seconds) {
+        return Long.toString(System.currentTimeMillis() - seconds * 1000L);
     }
 
     /** Submits the join form and returns the redirect target (the token page path). */

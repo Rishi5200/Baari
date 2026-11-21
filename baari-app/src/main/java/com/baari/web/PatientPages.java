@@ -13,6 +13,7 @@ import com.baari.queue.TokenActionService;
 import com.baari.queue.TokenService;
 import com.baari.queue.VisitType;
 import jakarta.validation.ConstraintViolationException;
+import java.time.Clock;
 import java.util.UUID;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -42,7 +43,14 @@ class PatientPages {
 
     private final EtaService eta;
 
-    PatientPages(QueueQueryService queries, TokenService tokens, TokenActionService actions, EtaService eta) {
+    /** A person needs at least this long to fill in the join form (PLAN §9.3). */
+    static final long MIN_FILL_MILLIS = 1500;
+
+    private final Clock clock;
+
+    PatientPages(
+            QueueQueryService queries, TokenService tokens, TokenActionService actions, EtaService eta, Clock clock) {
+        this.clock = clock;
         this.eta = eta;
         this.queries = queries;
         this.tokens = tokens;
@@ -50,7 +58,14 @@ class PatientPages {
     }
 
     @GetMapping("/j/{clinicSlug}/{queueSlug}")
-    String joinPage(@PathVariable String clinicSlug, @PathVariable String queueSlug, Model model) {
+    String joinPage(
+            @PathVariable String clinicSlug,
+            @PathVariable String queueSlug,
+            @RequestParam(name = "t", required = false) Long qrWindow,
+            @RequestParam(name = "sig", required = false) String qrSignature,
+            Model model) {
+        model.addAttribute("qrWindow", qrWindow);
+        model.addAttribute("qrSignature", qrSignature);
         return renderJoin(clinicSlug, queueSlug, "", "", VisitType.NEW, Ids.newId(), model);
     }
 
@@ -63,8 +78,19 @@ class PatientPages {
             @RequestParam(defaultValue = "NEW") VisitType visitType,
             @RequestParam(required = false) String consent,
             @RequestParam UUID idempotencyKey,
+            @RequestParam(defaultValue = "") String website,
+            @RequestParam(required = false) Long startedAt,
+            @RequestParam(name = "t", required = false) Long qrWindow,
+            @RequestParam(name = "sig", required = false) String qrSignature,
             Model model) {
+        model.addAttribute("qrWindow", qrWindow);
+        model.addAttribute("qrSignature", qrSignature);
         PublicQueueView queue = queries.publicQueue(clinicSlug, queueSlug);
+        if (!website.isEmpty() || startedAt == null || clock.millis() - startedAt < MIN_FILL_MILLIS) {
+            // looks like a bot; a person who was just very quick only has to send the form again
+            model.addAttribute("formErrorKey", "join.error.bot");
+            return renderJoin(clinicSlug, queueSlug, name, phone, visitType, idempotencyKey, model);
+        }
         if (consent == null) {
             model.addAttribute("formErrorKey", "join.error.consent");
             return renderJoin(clinicSlug, queueSlug, name, phone, visitType, idempotencyKey, model);
@@ -72,7 +98,14 @@ class PatientPages {
         try {
             IssuedToken issued = tokens.join(
                     queue.queueId(),
-                    new JoinRequest(name, phone.isBlank() ? null : phone, visitType, CONSENT_VERSION, idempotencyKey));
+                    new JoinRequest(
+                            name,
+                            phone.isBlank() ? null : phone,
+                            visitType,
+                            CONSENT_VERSION,
+                            idempotencyKey,
+                            qrWindow,
+                            qrSignature));
             return "redirect:/t/" + issued.publicCode();
         } catch (DomainException e) {
             // Paused, closed, full, already in the queue, bad phone number: tell the patient on the form.
@@ -99,6 +132,7 @@ class PatientPages {
         model.addAttribute("phone", phone);
         model.addAttribute("visitType", visitType);
         model.addAttribute("idempotencyKey", idempotencyKey);
+        model.addAttribute("startedAt", clock.millis());
         model.addAttribute("canJoin", queue.status() == QueueDayStatus.OPEN);
         return "patient/join";
     }

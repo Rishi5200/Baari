@@ -28,6 +28,13 @@
        open a session for every patient. The join form is CSRF-exempt (no login to ride on). */-->
   <form method="post" th:if="${canJoin}" th:attr="action=@{/j/{c}/{q}(c=${clinicSlug},q=${queueSlug})}">
     <input type="hidden" name="idempotencyKey" th:value="${idempotencyKey}">
+    <!--/* Anti-bot (PLAN §9.3): people never see the "website" field, bots fill every field; and a
+         form sent less than 1.5 s after it was shown was not filled in by a person. */-->
+    <input type="hidden" name="startedAt" th:value="${startedAt}">
+    <!--/* rotating QR: the window and signature from the scanned link travel with the form */-->
+    <input type="hidden" name="t" th:if="${qrWindow != null}" th:value="${qrWindow}">
+    <input type="hidden" name="sig" th:if="${qrSignature != null}" th:value="${qrSignature}">
+    <label class="hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off"></label>
     <label><span th:text="#{join.name}">Name</span>
       <input name="name" maxlength="60" required autocomplete="name" th:value="${name}"></label>
     <label><span th:text="#{join.phone}">Phone</span>

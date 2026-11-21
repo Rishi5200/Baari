@@ -31,6 +31,7 @@
     <palantir-java-format.version>2.103.0</palantir-java-format.version>
     <jacoco.version>0.8.16</jacoco.version>
     <tribuo.version>4.3.2</tribuo.version>
+    <bucket4j.version>8.22.0</bucket4j.version>
   </properties>
 
   <dependencyManagement>

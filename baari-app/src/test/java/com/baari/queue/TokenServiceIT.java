@@ -63,6 +63,9 @@ class TokenServiceIT extends AbstractIntegrationTest {
     }
 
     @Autowired
+    TokenActionService actions;
+
+    @Autowired
     TokenService tokens;
 
     @Autowired
@@ -333,6 +336,23 @@ class TokenServiceIT extends AbstractIntegrationTest {
 
             assertThatThrownBy(() -> tokens.issueWalkIn(otherAdmin, queueId, walkIn(Priority.NORMAL)))
                     .isInstanceOf(NotFoundException.class);
+        }
+
+        @Test
+        void onePhoneMayJoinAQueueAtMostThreeTimesADay() {
+            for (int i = 0; i < 3; i++) {
+                IssuedToken t = tokens.join(queueId, join("Asha", PHONE));
+                actions.cancelByPatient(t.publicCode()); // cancel and re-join, again and again
+            }
+
+            assertThatThrownBy(() -> tokens.join(queueId, join("Asha", PHONE)))
+                    .isInstanceOf(TooManyJoinsException.class)
+                    .hasMessageContaining("too many times today");
+            // reception can still help in person, and another phone is unaffected
+            assertThat(tokens.issueWalkIn(admin, queueId, walkIn(Priority.NORMAL))
+                            .created())
+                    .isTrue();
+            assertThat(tokens.join(queueId, join("Ravi", phone(7))).created()).isTrue();
         }
     }
 

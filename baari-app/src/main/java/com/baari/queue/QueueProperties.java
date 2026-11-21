@@ -11,6 +11,7 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param maxOpenTokens joins are refused once this many tokens of a day are still open (waiting,
  *     called, in consultation or no-show), so a flood of fake joins can't grow a queue forever
+ * @param maxJoinsPerPhone QR joins a day one phone number may make in one queue (PLAN §9.3)
  */
 @Validated
 @ConfigurationProperties("baari.queue")
@@ -19,7 +20,8 @@ record QueueProperties(
         @DefaultValue("3") @Min(0) int noShowGraceMinutes,
         @DefaultValue("2") @Min(1) int recallInsertOffset,
         @DefaultValue("2") @Min(0) int maxConsecutivePriority,
-        @DefaultValue("300") @Min(1) int maxOpenTokens) {
+        @DefaultValue("300") @Min(1) int maxOpenTokens,
+        @DefaultValue("3") @Min(1) int maxJoinsPerPhone) {
 
     NextTokenPolicy.Settings policySettings() {
         return new NextTokenPolicy.Settings(maxConsecutivePriority, recallInsertOffset);

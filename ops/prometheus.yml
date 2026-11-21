@@ -2,8 +2,9 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  # The app runs on the host in dev, so Prometheus reaches it via host.docker.internal.
+  # The app runs on the host in dev, so Prometheus reaches it via host.docker.internal. Metrics are on
+  # the management port (8086), never on the public port.
   - job_name: baari
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["host.docker.internal:8080"]
+      - targets: ["host.docker.internal:8086"]

@@ -145,11 +145,12 @@ psql "postgresql://baari:baari@localhost:5432/baari" -v csv=build/sim/tokens.csv
 # backtest: Default, Rolling, calibrated Rolling and the ML candidates; writes docs/eta-evaluation.md
 ./mvnw -pl baari-app compile exec:java -Dexec.args="--tokens build/sim/tokens.csv --out docs/eta-evaluation.md"
 
-# load test
-k6 run load/join-and-poll.js
+# load test (k6 in Docker; app running with the dev profile and --baari.queue.max-open-tokens=2000)
+docker run --rm -i --add-host=host.docker.internal:host-gateway -v "$PWD/load:/load" grafana/k6:1.8.3 run /load/join-and-poll.js
+psql "postgresql://baari:baari@localhost:5432/baari" -f load/verify-numbering.sql
 ```
 
-Dev URLs: app http://localhost:8080 · Grafana http://localhost:3000 · Prometheus http://localhost:9090.
+Dev URLs: app http://localhost:8080 (actuator on :8086) · Grafana http://localhost:3000 (dashboard "Baari overview") · Prometheus http://localhost:9090.
 Dev seed logins are defined in `application-dev.yml` (never used outside the dev profile).
 
 ---

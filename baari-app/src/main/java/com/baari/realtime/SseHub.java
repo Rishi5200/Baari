@@ -6,13 +6,18 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -34,6 +39,11 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Snapshots are complete state, never deltas, so a client that missed messages (network gap,
  * reconnect) is correct again after the next one.
+ *
+ * <p>Load (Phase 8 load test, ADR 0014): building a snapshot reads the database, and a queue may have
+ * hundreds of patients watching. So at most one flush per queue runs at a time (changes arriving
+ * meanwhile are merged into the next one), and all snapshot builds share {@link #SNAPSHOT_PERMITS}
+ * permits, leaving most of the connection pool to joins and staff actions.
  */
 @Component
 public class SseHub {
@@ -43,6 +53,8 @@ public class SseHub {
     static final Duration COALESCE = Duration.ofMillis(200);
     static final Duration HEARTBEAT = Duration.ofSeconds(15);
     static final Duration TIMEOUT = Duration.ofMinutes(30);
+    /** Snapshot builds running at once across all queues: well under the database pool (10). */
+    static final int SNAPSHOT_PERMITS = 4;
 
     private final JsonMapper json;
     private final MeterRegistry meters;
@@ -58,6 +70,10 @@ public class SseHub {
             Thread.ofPlatform().daemon().name("sse-timer").factory());
     /** One virtual thread per send, so a slow client can't hold up the others. */
     private final ExecutorService sender = Executors.newVirtualThreadPerTaskExecutor();
+    /** Bounds the snapshot builds (database reads) running at once. */
+    private final Semaphore snapshotPermits = new Semaphore(SNAPSHOT_PERMITS);
+    /** Queues with a flush in progress; another flush of the same queue waits for the next round. */
+    private final Set<UUID> flushing = ConcurrentHashMap.newKeySet();
 
     @Autowired
     SseHub(JsonMapper json, MeterRegistry meters) {
@@ -139,24 +155,63 @@ public class SseHub {
     }
 
     void flush(UUID queueId) {
+        if (!flushing.add(queueId)) {
+            // the previous round is still sending; try again shortly, its pending change is kept
+            timer.schedule(() -> flush(queueId), coalesce.toMillis(), TimeUnit.MILLISECONDS);
+            return;
+        }
         // Remove before reading the subscribers: a change that arrives from now on schedules a
         // new flush, so no change is ever swallowed by a flush that already started.
         Long seq = pending.remove(queueId);
         Set<Subscriber> set = byQueue.get(queueId);
         if (seq == null || set == null) {
+            flushing.remove(queueId);
             return;
         }
-        for (Subscriber subscriber : set) {
-            sender.execute(() -> push(subscriber, seq));
-        }
+        List<Subscriber> subscribers = List.copyOf(set);
+        sender.execute(() -> {
+            try {
+                List<Future<?>> sends = new ArrayList<>(subscribers.size());
+                for (Subscriber subscriber : subscribers) {
+                    sends.add(sender.submit(() -> push(subscriber, seq)));
+                }
+                for (Future<?> send : sends) {
+                    send.get();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (ExecutionException e) {
+                log.debug("a stream push failed: {}", e.getCause().toString());
+            } finally {
+                flushing.remove(queueId);
+            }
+        });
     }
 
     private void push(Subscriber subscriber, long seq) {
+        String snapshot;
         try {
-            subscriber.deliver(Long.toString(seq), json.writeValueAsString(subscriber.snapshot.get()));
+            snapshotPermits.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        try {
+            snapshot = json.writeValueAsString(subscriber.snapshot.get());
         } catch (RuntimeException e) {
             // Typically "token no longer exists" or access revoked. End the stream; the browser
             // reconnects and gets a proper HTTP error if the problem is permanent.
+            log.debug("closing stream of type {}: {}", subscriber.type, e.toString());
+            subscriber.close();
+            unregister(subscriber);
+            return;
+        } finally {
+            snapshotPermits.release();
+        }
+        try {
+            subscriber.deliver(Long.toString(seq), snapshot);
+        } catch (RuntimeException e) {
+            // the client went away mid-write
             log.debug("closing stream of type {}: {}", subscriber.type, e.toString());
             subscriber.close();
             unregister(subscriber);

@@ -45,7 +45,7 @@
      th:text="${view.room() != null} ? #{token.called.room(${view.room()})} : #{token.called.noRoom}">Please go to Room 2</p>
 </div>
 
-<script th:inline="javascript">
+<script th:inline="javascript" th:nonce="${cspNonce}">
   window.BAARI_T = {
     status: {
       WAITING: /*[[#{token.status.WAITING}]]*/ 'Waiting',

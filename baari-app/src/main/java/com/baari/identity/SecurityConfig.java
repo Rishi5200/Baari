@@ -32,7 +32,8 @@ class SecurityConfig {
                         // public
                         .requestMatchers("/login", "/error", "/css/**", "/js/**", "/favicon.ico")
                         .permitAll()
-                        // Prometheus scrapes without credentials; locked down in Phase 8 hardening.
+                        // Actuator runs on the management port only (not forwarded by Caddy, ADR 0014);
+                        // health for container probes, Prometheus for the scraper inside the network.
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus")
                         .permitAll()
                         // patients have no login; the public code in their link is the key

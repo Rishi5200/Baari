@@ -26,9 +26,17 @@
   </section>
 
   <p class="waiting"><span th:text="#{display.waiting}">Waiting</span>: <strong id="waiting" th:text="${board.waiting()}">4</strong></p>
+
+  <!--/* Rotating QR (PLAN §9.3): the link changes every minute; display.js fetches the next one. The QR
+       image itself needs a QR library, not added yet (ADR 0014), so the link is shown as text. */-->
+  <section class="join" th:if="${joinLink != null}" id="join"
+           th:attr="data-base=${joinBase},data-src=@{/api/display/queues/{id}/join-link(id=${queueId},key=${key})}">
+    <h2 th:text="#{display.join}">Join the queue from your phone</h2>
+    <p class="join-url" id="join-url" th:text="${joinBase + joinLink.path()}">https://example.com/j/clinic/queue?t=1&amp;sig=x</p>
+  </section>
 </main>
 
-<script th:inline="javascript">
+<script th:inline="javascript" th:nonce="${cspNonce}">
   window.BAARI_T = {
     notOpen: /*[[#{display.notOpen}]]*/ 'Not open yet',
     paused: /*[[#{display.paused}]]*/ 'Paused',

@@ -1,0 +1,14 @@
+# Production profile (Phase 8/9). Secrets and hosts come from environment variables only (PLAN §9.5).
+logging:
+  structured:
+    format:
+      # One JSON object per line (Elastic Common Schema); clinicId, staffUserId and queueDayId from
+      # the MDC appear as fields of every line logged during a request.
+      console: ecs
+  level:
+    com.baari: INFO
+
+server:
+  error:
+    include-stacktrace: never
+    include-message: never

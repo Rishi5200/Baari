@@ -23,8 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Patient-facing API (PLAN Appendix A). No login: the queue id comes from the QR code and the
- * public code in the token link is the patient's key. Rate limits and rotating-QR checks come in
- * Phase 8; {@code qrWindow} and {@code qrSig} are accepted and ignored until then.
+ * public code in the token link is the patient's key. Per-IP rate limits apply (ADR 0014), and
+ * queues in rotating-QR mode need {@code qrWindow} and {@code qrSig} from the TV's current link.
  */
 @RestController
 @RequestMapping("/api/public")
@@ -56,7 +56,15 @@ class PublicQueueApi {
             @RequestHeader(name = "Idempotency-Key", required = false) UUID headerKey) {
         UUID key = body.idempotencyKey() != null ? body.idempotencyKey() : headerKey;
         IssuedToken issued = tokens.join(
-                queueId, new JoinRequest(body.name(), body.phone(), body.visitType(), body.consentVersion(), key));
+                queueId,
+                new JoinRequest(
+                        body.name(),
+                        body.phone(),
+                        body.visitType(),
+                        body.consentVersion(),
+                        key,
+                        body.qrWindow(),
+                        body.qrSig()));
         return ResponseEntity.status(issued.created() ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(JoinResponse.of(issued));
     }
@@ -72,7 +80,7 @@ class PublicQueueApi {
         return queries.publicToken(publicCode);
     }
 
-    /** The join form. {@code qrWindow}/{@code qrSig} are for rotating QR codes (Phase 8). */
+    /** The join form. {@code qrWindow}/{@code qrSig} come from the TV's link for rotating QR queues. */
     record JoinBody(
             String name,
             String phone,

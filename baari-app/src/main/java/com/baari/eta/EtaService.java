@@ -60,6 +60,9 @@ public class EtaService {
 
     private final Map<UUID, Projected> projections = new ConcurrentHashMap<>();
     private final Map<UUID, LoadedEstimator> estimators = new ConcurrentHashMap<>();
+    /** Bumped when a clinic's history changes; a cache entry from an older generation is stale. */
+    private final Map<UUID, java.util.concurrent.atomic.AtomicLong> generations = new ConcurrentHashMap<>();
+
     private final Map<UUID, CachedChampion> champions = new ConcurrentHashMap<>();
     private final Map<UUID, Map<UUID, Held>> held = new ConcurrentHashMap<>();
 
@@ -85,7 +88,8 @@ public class EtaService {
             String estimator, QueueLiveState state, Instant at, Map<UUID, QueueProjector.Projection> byToken) {}
 
     /** A clinic's estimator and range calibration factor, reloaded at most once a minute. */
-    private record LoadedEstimator(Instant loadedAt, ServiceTimeEstimator estimator, double calibration) {}
+    private record LoadedEstimator(
+            Instant loadedAt, long generation, ServiceTimeEstimator estimator, double calibration) {}
 
     /** The last champion read for a clinic; {@code champion} is empty if its artifact could not be loaded. */
     private record CachedChampion(UUID modelId, Optional<MlModelStore.Champion> champion) {}
@@ -186,8 +190,14 @@ public class EtaService {
     }
 
     private LoadedEstimator loaded(UUID clinicId, ZoneId zone, Instant now) {
+        // Read the generation before the history: if a consultation finishes while we load, the entry
+        // we build carries the old generation and is never used, instead of hiding the new data for
+        // a minute (a background projection racing with the invalidation below).
+        long generation = generation(clinicId).get();
         LoadedEstimator loaded = estimators.get(clinicId);
-        if (loaded == null || Duration.between(loaded.loadedAt(), now).compareTo(HISTORY_TTL) >= 0) {
+        if (loaded == null
+                || loaded.generation() != generation
+                || Duration.between(loaded.loadedAt(), now).compareTo(HISTORY_TTL) >= 0) {
             List<ServiceSample> samples =
                     history.recent(clinicId, now.minus(Duration.ofDays(props.historyDays())), props.historyLimit());
             DefaultEstimator fallback = new DefaultEstimator(props.defaultServiceMinutes() * 60);
@@ -205,7 +215,7 @@ public class EtaService {
             ServiceTimeEstimator chosen = champion(clinicId)
                     .<ServiceTimeEstimator>map(c -> new MlEstimator(c.model(), c.version(), statistics))
                     .orElse(statistics);
-            loaded = new LoadedEstimator(now, chosen, calibration.factor(clinicId));
+            loaded = new LoadedEstimator(now, generation, chosen, calibration.factor(clinicId));
             estimators.put(clinicId, loaded);
         }
         return loaded;
@@ -229,9 +239,14 @@ public class EtaService {
         return cached.champion();
     }
 
+    private java.util.concurrent.atomic.AtomicLong generation(UUID clinicId) {
+        return generations.computeIfAbsent(clinicId, id -> new java.util.concurrent.atomic.AtomicLong());
+    }
+
     /** A finished consultation changes the clinic's statistics, so the next estimate reloads them. */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void onConsultCompleted(ConsultCompleted event) {
+        generation(event.clinicId()).incrementAndGet();
         estimators.remove(event.clinicId());
     }
 

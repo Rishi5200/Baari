@@ -75,6 +75,9 @@ public class StaffAdminService {
         UUID clinicId = Permissions.requireClinicAdmin(caller);
         StaffUserEntity user = find(userId, clinicId);
         checkRole(clinicId, role, doctorId);
+        if (role != StaffRole.CLINIC_ADMIN) {
+            guardLastAdmin(caller, user, clinicId, "change the role of");
+        }
         user.changeRole(role, doctorId);
         return user.toView();
     }
@@ -89,6 +92,9 @@ public class StaffAdminService {
     public StaffUserView setEnabled(StaffPrincipal caller, UUID userId, boolean enabled) {
         UUID clinicId = Permissions.requireClinicAdmin(caller);
         StaffUserEntity user = find(userId, clinicId);
+        if (!enabled) {
+            guardLastAdmin(caller, user, clinicId, "disable");
+        }
         user.setEnabled(enabled);
         return user.toView();
     }
@@ -108,6 +114,24 @@ public class StaffAdminService {
             doctors.findByIdAndClinicId(doctorId, clinicId).orElseThrow(() -> new NotFoundException("Doctor"));
         } else if (doctorId != null) {
             throw new InvalidRequestException("Only a DOCTOR login can be linked to a doctor.");
+        }
+    }
+
+    /**
+     * Stops a change that takes an active clinic admin away (ADR 0009 item 1): an admin may not lock
+     * themselves out, and the clinic's last active admin stays.
+     */
+    private void guardLastAdmin(StaffPrincipal caller, StaffUserEntity user, UUID clinicId, String action) {
+        if (user.getRole() != StaffRole.CLINIC_ADMIN || !user.isEnabled()) {
+            return; // not an active admin: nothing is taken away
+        }
+        if (user.getId().equals(caller.userId())) {
+            throw new LastAdminException("You cannot " + action + " your own admin account. Ask another admin.");
+        }
+        if (staff.findAllByClinicIdAndRoleAndEnabledTrue(clinicId, StaffRole.CLINIC_ADMIN)
+                        .size()
+                <= 1) {
+            throw new LastAdminException("This is the clinic's last active admin. Make someone else an admin first.");
         }
     }
 

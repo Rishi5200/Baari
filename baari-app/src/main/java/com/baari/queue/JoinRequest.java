@@ -19,7 +19,14 @@ public record JoinRequest(
         @Size(max = 30) String phone,
         @NotNull VisitType visitType,
         @NotBlank @Size(max = 20) String consentVersion,
-        @NotNull UUID idempotencyKey) {
+        @NotNull UUID idempotencyKey,
+        Long qrWindow,
+        @Size(max = 64) String qrSignature) {
+
+    /** A join from a static QR code (poster) or the API without a rotating code. */
+    public JoinRequest(String name, String phone, VisitType visitType, String consentVersion, UUID idempotencyKey) {
+        this(name, phone, visitType, consentVersion, idempotencyKey, null, null);
+    }
 
     /** Names may be logged by accident; the phone number must never be. */
     @Override

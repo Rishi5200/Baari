@@ -35,6 +35,24 @@ public class QueueDirectory {
         this.doctors = doctors;
     }
 
+    /** The rotating-QR signature of a queue for a window (for the TV); empty if the queue is unknown. */
+    @Transactional(readOnly = true)
+    public Optional<String> qrSignature(UUID queueId, long window) {
+        return queues.findById(queueId).map(q -> RotatingQr.sign(q.getQrSecret(), queueId, window));
+    }
+
+    /** Is {@code signature} the queue's signature for {@code window}? Compared in constant time. */
+    @Transactional(readOnly = true)
+    public boolean qrSignatureMatches(UUID queueId, long window, String signature) {
+        if (signature == null || signature.isBlank()) {
+            return false;
+        }
+        return qrSignature(queueId, window)
+                .map(expected -> MessageDigest.isEqual(
+                        expected.getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8)))
+                .orElse(false);
+    }
+
     /** Every clinic, for scheduled jobs that run per clinic (nightly model training). */
     @Transactional(readOnly = true)
     public java.util.List<ClinicView> allClinics() {

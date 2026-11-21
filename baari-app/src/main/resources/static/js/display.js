@@ -33,3 +33,24 @@
     byId('conn').hidden = state === 'live';
   });
 })();
+
+// Rotating QR (PLAN §9.3): a link is accepted for about two minutes, so fetch the next one every 20 s.
+(function () {
+  const join = document.getElementById('join');
+  if (!join) {
+    return;
+  }
+  const url = document.getElementById('join-url');
+  async function refresh() {
+    try {
+      const response = await fetch(join.dataset.src, { cache: 'no-store' });
+      if (response.ok) {
+        const link = await response.json();
+        url.textContent = join.dataset.base + link.path;
+      }
+    } catch (e) {
+      // offline for a moment: keep the current link and try again on the next tick
+    }
+  }
+  setInterval(refresh, 20000);
+})();

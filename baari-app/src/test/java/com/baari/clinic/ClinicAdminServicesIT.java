@@ -332,5 +332,46 @@ class ClinicAdminServicesIT extends AbstractIntegrationTest {
                             staffRepository.findById(id).orElseThrow().getPasswordHash()))
                     .isTrue();
         }
+
+        // --- last-admin guard (ADR 0009 item 1) ---
+
+        private UUID onlyAdminOfClinicA() {
+            return staffAdmin.list(adminA).stream()
+                    .filter(u -> u.role() == StaffRole.CLINIC_ADMIN)
+                    .findFirst()
+                    .orElseThrow()
+                    .id();
+        }
+
+        @Test
+        void theLastActiveAdminCanBeNeitherDisabledNorDemoted() {
+            UUID only = onlyAdminOfClinicA();
+
+            assertThatThrownBy(() -> staffAdmin.setEnabled(adminA, only, false))
+                    .isInstanceOf(LastAdminException.class)
+                    .hasMessageContaining("last active admin");
+            assertThatThrownBy(() -> staffAdmin.changeRole(adminA, only, StaffRole.RECEPTIONIST, null))
+                    .isInstanceOf(LastAdminException.class);
+            assertThat(staffRepository.findById(only).orElseThrow().isEnabled()).isTrue();
+        }
+
+        @Test
+        void withASecondAdminTheFirstCanBeDisabledButNobodyCanLockThemselvesOut() {
+            UUID first = onlyAdminOfClinicA();
+            UUID second = staffAdmin
+                    .create(adminA, new NewStaffUser(unique("adm"), "s3cret-pass", StaffRole.CLINIC_ADMIN, null))
+                    .id();
+            StaffPrincipal secondHimself =
+                    new StaffPrincipal(second, "second", StaffRole.CLINIC_ADMIN, clinicA.id(), null);
+
+            assertThatThrownBy(() -> staffAdmin.setEnabled(secondHimself, second, false))
+                    .isInstanceOf(LastAdminException.class)
+                    .hasMessageContaining("your own");
+            assertThat(staffAdmin.setEnabled(secondHimself, first, false).enabled())
+                    .isFalse();
+            // now the second is the last one again
+            assertThatThrownBy(() -> staffAdmin.changeRole(adminA, second, StaffRole.RECEPTIONIST, null))
+                    .isInstanceOf(LastAdminException.class);
+        }
     }
 }

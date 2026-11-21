@@ -3,7 +3,7 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 7 — ML ETA: built, all "Done when" items met (2026-11-21), not tagged until CI passes. Phases 1 to 4 and 6 are tagged. Phase 5 is complete except the Telegram channel and its phone check, which the user has deferred until all phases are done, so `phase-5` is not tagged.
+Phase 8 — Hardening & observability: built, all "Done when" items met (2026-11-21), tag after CI. Phases 1 to 4, 6 and 7 are tagged. Phase 5 is complete except the Telegram channel and its phone check, which the user deferred until all phases are done, so `phase-5` is not tagged.
 
 ## Phase 4 plan (all built, 2026-11-20)
 1. [x] Queue read models for ETA: `QueueLiveState`, `TokenLocator`, `ServiceSample`/`ServiceHistory` (queue module, no patient details); `EventLog.publish` also publishes the domain event in-process
@@ -137,11 +137,25 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 - [x] Backtest: ML candidates tie Rolling on the simulated clinic (7.4 min wait error; consultation length 2.59 / 2.64 vs 2.61 min), so the 5% rule keeps Rolling. The simulator's lognormal noise around per-doctor, per-hour medians leaves little for a model to learn; `MlTrainingIT` shows promotion when length depends on session position.
 - Backtest now runs with `./mvnw -pl baari-app compile exec:java -Dexec.args="--tokens build/sim/tokens.csv --out docs/eta-evaluation.md"`.
 
+## Phase 8 (2026-11-21, ADR 0014)
+- [x] Per-IP rate limits (Bucket4j + Redis filter): join 10/min, token page 60/min, login 10/min; 429 + Retry-After; off in tests, `RateLimitIT` (3).
+- [x] Per-phone limit: 3 QR joins per queue per day (`TooManyJoinsException`, 429); `TokenServiceIT` case.
+- [x] Join form honeypot + 1.5 s minimum fill time; `LivePagesIT` case.
+- [x] CSP with per-request nonce, Referrer-Policy, Permissions-Policy (`SecurityHeadersFilter`); poster print button moved to `print.js`.
+- [x] Actuator on management port 8086 (`BAARI_MANAGEMENT_PORT`), not on the public port; `ApplicationSmokeIT` checks both and the headers.
+- [x] Last-admin guard (ADR 0009 item 1), row-locked; `ClinicAdminServicesIT` cases.
+- [x] Rotating QR: signed minute windows, current and previous accepted, TV shows and refreshes the link; `RotatingQrTest`, `RotatingQrAndRetentionIT` (old window rejected).
+- [x] PII retention job (30 days, batches, `PiiPurged` -> notification deletes Telegram links); test: PII nulled, timings intact.
+- [x] JSON logs in prod (ECS) with clinicId/staffUserId/queueDayId MDC; metrics `baari.tokens.issued`, `baari.wait.actual.seconds`; HTTP latency histogram.
+- [x] Grafana dashboard (`ops/grafana/dashboards/baari.json`, from `ops/grafana/make_dashboard.py`), provisioned, anonymous read in dev; Prometheus v3.16.0 and Grafana 13.3.0 pinned; screenshot `docs/images/grafana-dashboard.png`.
+- [x] k6 `load/join-and-poll.js` (300 patients over 2 min holding SSE, staff call every 20 s): first run exposed unbounded SSE fan-out (join p95 21 s, 15 errors); fixed (one flush per queue, 4 snapshot permits); rerun join p95 73 ms, 0 errors, 300/300; `load/verify-numbering.sql` ok (1..598).
+- [x] Fixed an estimator-cache race found by the full build (generation per clinic).
+- Not done: QR image on the TV and poster (needs a QR library such as ZXing; PLAN says ask first). OWASP dependency check / Dependabot in CI (PLAN 9.5) moves to Phase 9 with the deploy pipeline.
+
 ## Next
-1. Phase 8 — Hardening & observability (includes ADR 0009 items 2 and 3: lock down `/actuator/prometheus`, pin Prometheus and Grafana).
-2. Phase 9 — Deploy & README; Phase 10 — pilot.
+1. Phase 9 — Deploy & README (Docker image, compose prod, Caddy, Dependabot/dependency check).
+2. Phase 10 — pilot. Decide on ZXing for QR images (poster, rotating TV code).
 3. After all phases (user's instruction): Telegram channel, phone check, tag `phase-5`.
-2. Last-admin guard (ADR 0009 item 1), small `clinic` change with an integration test; can ride along with any phase
 4. Session timetable (product decision): would remove the short bias at JOIN (ADR 0012).
 
 ## Open questions for the user

@@ -19,6 +19,17 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc</artifactId>
     </dependency>
+    <!-- rate limits with buckets kept in Redis, shared by every instance (PLAN 9.3, CLAUDE.md stack) -->
+    <dependency>
+      <groupId>com.bucket4j</groupId>
+      <artifactId>bucket4j_jdk17-core</artifactId>
+      <version>${bucket4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.bucket4j</groupId>
+      <artifactId>bucket4j_jdk17-lettuce</artifactId>
+      <version>${bucket4j.version}</version>
+    </dependency>
     <!-- ML wait-time model (PLAN 8.6, CLAUDE.md stack): linear SGD and CART regression -->
     <dependency>
       <groupId>org.tribuo</groupId>

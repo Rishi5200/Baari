@@ -57,6 +57,7 @@ public class TokenActionService {
     private final TokenRepository tokens;
     private final EventLog events;
     private final QueueProperties settings;
+    private final QueueMetrics metrics;
     private final Clock clock;
 
     TokenActionService(
@@ -66,7 +67,9 @@ public class TokenActionService {
             TokenRepository tokens,
             EventLog events,
             QueueProperties settings,
+            QueueMetrics metrics,
             Clock clock) {
+        this.metrics = metrics;
         this.access = access;
         this.directory = directory;
         this.days = days;
@@ -147,6 +150,8 @@ public class TokenActionService {
         TokenEntity token = locked.token();
         boolean direct = token.getStatus() == TokenStatus.WAITING;
         token.start(doctorIfKnown(caller, locked.info()), now);
+        metrics.consultationStarted(
+                java.time.Duration.between(token.getJoinedAt(), now).toSeconds());
         long seq = append(
                 locked, caller, EventType.CONSULT_STARTED, now, data(token, "doctorId", token.getServedByDoctorId()));
         events.publish(new ConsultStarted(

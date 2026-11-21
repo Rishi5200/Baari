@@ -3,7 +3,7 @@
 <head th:replace="~{layout :: head('Poster')}"></head>
 <body class="poster">
 <main>
-  <p class="no-print"><button type="button" onclick="window.print()">Print</button>
+  <p class="no-print"><button type="button" id="print">Print</button>
     <a th:href="@{/admin/queues}">Back to queues</a></p>
   <h1 th:text="${queue.clinicName()}">Sharma Clinic</h1>
   <h2 th:text="${queue.info().queue().name()}">General OPD</h2>
@@ -12,5 +12,6 @@
   <p class="join-url" th:text="${joinUrl}">https://example.com/j/clinic/queue</p>
   <p class="muted no-print">Open this address on a phone. A scannable QR code will be added once a QR library is approved.</p>
 </main>
+<script th:src="@{/js/print.js}" defer></script>
 </body>
 </html>

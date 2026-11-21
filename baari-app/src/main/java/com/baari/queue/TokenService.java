@@ -1,7 +1,9 @@
 package com.baari.queue;
 
+import com.baari.clinic.QrMode;
 import com.baari.clinic.QueueDirectory;
 import com.baari.clinic.QueueInfo;
+import com.baari.clinic.RotatingQr;
 import com.baari.clinic.StaffPrincipal;
 import com.baari.common.Ids;
 import com.baari.common.NotFoundException;
@@ -58,6 +60,7 @@ public class TokenService {
     private final EventLog events;
     private final PhoneHasher phoneHasher;
     private final QueueProperties settings;
+    private final QueueMetrics metrics;
     private final Clock clock;
     private final TransactionTemplate transaction;
 
@@ -69,8 +72,10 @@ public class TokenService {
             EventLog events,
             PhoneHasher phoneHasher,
             QueueProperties settings,
+            QueueMetrics metrics,
             Clock clock,
             PlatformTransactionManager transactionManager) {
+        this.metrics = metrics;
         this.directory = directory;
         this.access = access;
         this.days = days;
@@ -96,8 +101,26 @@ public class TokenService {
                 Priority.NORMAL,
                 TokenSource.QR,
                 request.consentVersion(),
-                request.idempotencyKey());
+                request.idempotencyKey(),
+                qrCodeValid(info, request));
         return issue(info, token, ActorType.PATIENT, null);
+    }
+
+    /**
+     * Static queues need no code. Rotating queues accept the TV's current window and the one before
+     * it (a patient may scan just before the code changes), signed with the queue's secret.
+     */
+    private boolean qrCodeValid(QueueInfo info, JoinRequest request) {
+        if (info.queue().qrMode() != QrMode.ROTATING) {
+            return true;
+        }
+        if (request.qrWindow() == null || request.qrSignature() == null) {
+            return false;
+        }
+        long current = RotatingQr.window(clock.instant());
+        long w = request.qrWindow();
+        return (w == current || w == current - 1)
+                && directory.qrSignatureMatches(info.queue().id(), w, request.qrSignature());
     }
 
     /**
@@ -113,7 +136,8 @@ public class TokenService {
                 request.priority(),
                 TokenSource.RECEPTION,
                 null,
-                request.idempotencyKey());
+                request.idempotencyKey(),
+                true);
         return issue(info, token, ActorType.STAFF, caller.userId());
     }
 
@@ -145,6 +169,11 @@ public class TokenService {
             }
         }
 
+        // checked after the retry lookup, so a patient whose join is retried after the code changed
+        // still gets their token back
+        if (!request.qrCodeValid()) {
+            throw new QrExpiredException();
+        }
         switch (day.getStatus()) {
             case CLOSED -> throw new QueueClosedException();
             case PAUSED -> {
@@ -163,6 +192,14 @@ public class TokenService {
                     .ifPresent(other -> {
                         throw new AlreadyInQueueException(displayCode(info, other));
                     });
+        }
+        // patients joining by QR: at most N tokens a day per phone in this queue, whatever happened
+        // to the earlier ones (reception can always issue a walk-in)
+        if (patient.phoneHash() != null
+                && request.source() == TokenSource.QR
+                && tokens.countByQueueDayIdAndPhoneHash(day.getId(), patient.phoneHash())
+                        >= settings.maxJoinsPerPhone()) {
+            throw new TooManyJoinsException();
         }
         if (tokens.countByQueueDayIdAndStatusIn(day.getId(), TokenStatus.OPEN) >= settings.maxOpenTokens()) {
             throw new QueueFullException();
@@ -207,6 +244,9 @@ public class TokenService {
                 request.priority(),
                 request.visitType(),
                 request.source()));
+        metrics.tokenIssued(request.source());
+        // the day's id travels with every log line of this request (JSON logs, ADR 0014)
+        org.slf4j.MDC.put("queueDayId", day.getId().toString());
         return toIssued(token, day, info, true);
     }
 
@@ -259,5 +299,6 @@ public class TokenService {
             Priority priority,
             TokenSource source,
             String consentVersion,
-            UUID idempotencyKey) {}
+            UUID idempotencyKey,
+            boolean qrCodeValid) {}
 }

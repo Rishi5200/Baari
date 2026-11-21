@@ -138,3 +138,6 @@ body.poster h1 { font-size: 3rem; margin-bottom: 0; }
 body.poster .lead { font-size: 1.5rem; }
 .join-url { font-size: 1.6rem; font-weight: 700; word-break: break-all; border: 3px dashed var(--accent); padding: 1.5rem; }
 @media print { .no-print, .topbar { display: none !important; } body { background: #fff; } }
+
+/* honeypot field on the join form: off screen for people, still filled in by naive bots */
+.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }

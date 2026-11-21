@@ -61,7 +61,7 @@
   <p class="muted small" th:text="#{console.shortcuts}">Shortcuts</p>
 </main>
 
-<script th:inline="javascript">
+<script th:inline="javascript" th:nonce="${cspNonce}">
   window.BAARI_T = {
     dayStatus: {
       NOT_OPENED: /*[[#{console.day.notOpened}]]*/ 'Not opened today',

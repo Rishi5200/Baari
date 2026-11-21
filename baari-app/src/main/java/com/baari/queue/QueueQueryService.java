@@ -187,6 +187,26 @@ public class QueueQueryService {
     }
 
     /**
+     * For a rotating-QR queue, the join link the TV shows right now (path and query, the page adds the
+     * host), and until when it is accepted. Empty for static queues. Same key check as the board.
+     */
+    @Transactional(readOnly = true)
+    public Optional<DisplayJoinLink> displayJoinLink(UUID queueId, String displayKey) {
+        if (!directory.displayKeyMatches(queueId, displayKey)) {
+            throw new NotFoundException("Display");
+        }
+        PublicQueue queue = directory.findPublic(queueId).orElseThrow(() -> new NotFoundException("Display"));
+        if (queue.info().queue().qrMode() != com.baari.clinic.QrMode.ROTATING) {
+            return Optional.empty();
+        }
+        long window = com.baari.clinic.RotatingQr.window(clock.instant());
+        String signature = directory.qrSignature(queueId, window).orElseThrow();
+        String path =
+                "/j/" + queue.clinicSlug() + "/" + queue.info().queue().slug() + "?t=" + window + "&sig=" + signature;
+        return Optional.of(new DisplayJoinLink(path, window, com.baari.clinic.RotatingQr.validUntil(window)));
+    }
+
+    /**
      * The TV board. Open to anyone holding the queue's display key; a wrong key and an unknown
      * queue both answer "not found" so the screen's URL can't be used to probe ids.
      */
