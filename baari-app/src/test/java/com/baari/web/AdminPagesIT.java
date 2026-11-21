@@ -374,4 +374,24 @@ class AdminPagesIT extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().string(containsString("Doctor not found.")));
     }
+
+    @Test
+    void theClinicAdminSeesThePredictionAccuracyPageAndCanTrain() throws Exception {
+        mvc.perform(get("/admin/accuracy").with(as(adminA)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Prediction accuracy")))
+                .andExpect(content().string(containsString("No model trained yet.")));
+        // a new clinic has no history, so training reports that and changes nothing
+        mvc.perform(post("/admin/accuracy/train").with(csrf()).with(as(adminA)))
+                .andExpect(redirectedUrl("/admin/accuracy"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash()
+                        .attribute("flash", containsString("Not enough history yet")));
+    }
+
+    @Test
+    void otherRolesCannotSeeAccuracyOrTrain() throws Exception {
+        mvc.perform(get("/admin/accuracy").with(as(receptionistA))).andExpect(status().isForbidden());
+        mvc.perform(post("/admin/accuracy/train").with(csrf()).with(as(doctorUserA)))
+                .andExpect(status().isForbidden());
+    }
 }

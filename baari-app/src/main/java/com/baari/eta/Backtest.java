@@ -166,7 +166,7 @@ public final class Backtest {
         List<TrainingExamples.Example> testExamples = TrainingExamples.from(after, settings.zone());
         List<ModelTrainer.Candidate> candidates = ModelTrainer.train(trainExamples, testExamples);
         RollingStatsEstimator rollingAtTestStart = new RollingStatsEstimator(
-                samplesBefore(history, testStart, settings.zone()), settings.minSamples(), fallback);
+                TrainingExamples.rollingSamples(history, testStart, settings.zone()), settings.minSamples(), fallback);
         Map<String, ModelTrainer.ServiceMetrics> serviceMetrics = new LinkedHashMap<>();
         serviceMetrics.put(DEFAULT, ModelTrainer.score(fallback, testExamples));
         serviceMetrics.put(ROLLING, ModelTrainer.score(rollingAtTestStart, testExamples));
@@ -184,7 +184,7 @@ public final class Backtest {
                 factorAtTestStart = factor;
             }
             RollingStatsEstimator rolling = new RollingStatsEstimator(
-                    samplesBefore(history, day, settings.zone()), settings.minSamples(), fallback);
+                    TrainingExamples.rollingSamples(history, day, settings.zone()), settings.minSamples(), fallback);
             ServiceTimeEstimator inUse = rolling.hasEnoughData() ? rolling : fallback;
             List<WaitReplay.Variant> variants = new ArrayList<>();
             if (isTest) {
@@ -214,21 +214,6 @@ public final class Backtest {
             factor = RangeCalibration.adjust(factor, covered, recent.size());
         }
         return new Result(train, test, scored, serviceMetrics, factorAtTestStart, factor);
-    }
-
-    /** Finished consultations from days before {@code day}, newest first, as Rolling expects. */
-    static List<RollingStatsEstimator.Sample> samplesBefore(List<HistoricalToken> tokens, LocalDate day, ZoneId zone) {
-        return tokens.stream()
-                .filter(t -> t.serviceDate().isBefore(day) && t.hasServiceTime())
-                .sorted(Comparator.comparing(HistoricalToken::consultStartedAt).reversed())
-                .map(t -> new RollingStatsEstimator.Sample(
-                        t.doctorId(),
-                        t.visitType(),
-                        t.consultStartedAt().atZone(zone).getHour(),
-                        (int) (t.completedAt().getEpochSecond()
-                                - t.consultStartedAt().getEpochSecond())))
-                .limit(5000)
-                .toList();
     }
 
     private static UUID doctorId(String name) {

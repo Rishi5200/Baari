@@ -20,6 +20,7 @@
       <a th:href="@{/admin/doctors}">Doctors</a>
       <a th:href="@{/admin/queues}">Queues</a>
       <a th:if="${isClinicAdmin}" th:href="@{/admin/staff}">Staff</a>
+      <a th:if="${isClinicAdmin}" th:href="@{/admin/accuracy}">Accuracy</a>
     </th:block>
   </nav>
   <div class="who" th:if="${caller != null}">

@@ -61,6 +61,11 @@ public class QueueQueryService {
         this.clock = clock;
     }
 
+    /** The call-order settings in force, so replays of past days order patients as the queue did. */
+    public NextTokenPolicy.Settings policySettings() {
+        return settings.policySettings();
+    }
+
     /** The queue behind a join link, with today's status and how many are waiting. */
     @Transactional(readOnly = true)
     public PublicQueueView publicQueue(String clinicSlug, String queueSlug) {

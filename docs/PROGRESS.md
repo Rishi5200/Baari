@@ -3,7 +3,7 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 6 — Simulator & backtesting: built, all "Done when" items met (2026-11-21), not tagged yet. Phase 5 is complete except the Telegram channel and its phone check (the user supplies the bot later), so `phase-5` is not tagged either. Phases 1 to 4 are tagged `phase-1` to `phase-4`.
+Phase 7 — ML ETA: built, all "Done when" items met (2026-11-21), not tagged until CI passes. Phases 1 to 4 and 6 are tagged. Phase 5 is complete except the Telegram channel and its phone check, which the user has deferred until all phases are done, so `phase-5` is not tagged.
 
 ## Phase 4 plan (all built, 2026-11-20)
 1. [x] Queue read models for ETA: `QueueLiveState`, `TokenLocator`, `ServiceSample`/`ServiceHistory` (queue module, no patient details); `EventLog.publish` also publishes the domain event in-process
@@ -127,10 +127,22 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 - [ ] Optional `drive` command (accelerated live day against a running app). Not built; useful for the README GIF in Phase 9.
 - Known gap (ADR 0012): estimates lean short, mostly at JOIN, because late session starts and joins before the doctor arrives are not modelled; the app has no session timetable. Product decision needed before Phase 7 compares the ML model.
 
+## Phase 7 (2026-11-21, ADR 0013)
+- [x] Tribuo 4.3.2 (regression SGD and tree) works with Boot's protobuf 4.x: trained, serialized, reloaded.
+- [x] `ServiceContext` carries priority, weekday, place and time in the doctor's session, queue length; `Sessions` (90-minute pause rule, no timetable) shared by training and the projector; `EtaService` passes each doctor's session.
+- [x] `TrainingExamples` (features as at the consultation start; `TrainingExamplesTest` proves later events change nothing), `ServiceFeatures`, `ServiceTimeModel` (log target, smearing, residual range, protobuf artifact), `ModelTrainer` (LINEAR_SGD, CART), `MlEstimator` with per-prediction fallback. `ServiceTimeModelTest`.
+- [x] `WaitReplay` extracted from the backtest; `HistoricalToken` + `ServiceHistory.tokens` in queue.
+- [x] `ml_model` (V7, one champion per clinic by partial unique index), `MlModelStore`, `MlTraining` (hourly cron, trains at 02:30 clinic time; D-60..D-8 train, D-7..D-1 test; promote only on 5% better wait error than champion or Rolling), champion used by `EtaService` (reloaded only when the champion changes; corrupt artifact -> ALERT log, `baari.eta.ml.load_failures`, Rolling). `MlTrainingIT` (6).
+- [x] `/admin/accuracy` (clinic admin): live MAE and coverage per estimator over 14 days, calibration factor, no-show rate, model history, "Train now". `AdminPagesIT` +2.
+- [x] Backtest: ML candidates tie Rolling on the simulated clinic (7.4 min wait error; consultation length 2.59 / 2.64 vs 2.61 min), so the 5% rule keeps Rolling. The simulator's lognormal noise around per-doctor, per-hour medians leaves little for a model to learn; `MlTrainingIT` shows promotion when length depends on session position.
+- Backtest now runs with `./mvnw -pl baari-app compile exec:java -Dexec.args="--tokens build/sim/tokens.csv --out docs/eta-evaluation.md"`.
+
 ## Next
-1. Finish Phase 5: Telegram channel, full verify, CI, tag. (Rolling statistics stay Postgres-backed with a one-minute cache, so no RollingStatsUpdater; see ADR 0011.)
+1. Phase 8 — Hardening & observability (includes ADR 0009 items 2 and 3: lock down `/actuator/prometheus`, pin Prometheus and Grafana).
+2. Phase 9 — Deploy & README; Phase 10 — pilot.
+3. After all phases (user's instruction): Telegram channel, phone check, tag `phase-5`.
 2. Last-admin guard (ADR 0009 item 1), small `clinic` change with an integration test; can ride along with any phase
-3. Phase 8: lock down `/actuator/prometheus`, pin Prometheus and Grafana versions (ADR 0009 items 2 and 3). Deploy blocker for Phase 9.
+4. Session timetable (product decision): would remove the short bias at JOIN (ADR 0012).
 
 ## Open questions for the user
 None. The four earlier questions were decided by Claude on 2026-11-20 and recorded in `docs/adr/0009-open-questions-resolved-after-phase-3.md`; the user can overrule them. Port 8080 on this machine is held by an unrelated process, so run locally with `--server.port=8081`.

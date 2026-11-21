@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Prediction accuracy')}"></head>
+<body>
+<header th:replace="~{layout :: topbar}"></header>
+<main>
+  <div class="page-head">
+    <h1>Prediction accuracy</h1>
+    <form method="post" th:action="@{/admin/accuracy/train}" class="inline">
+      <button type="submit">Train now</button>
+    </form>
+  </div>
+  <th:block th:replace="~{layout :: flash}"></th:block>
+
+  <h2>Shown waits, last 14 days</h2>
+  <p class="muted">How far the estimate shown to patients was from the wait that followed. Patients who never
+    reached the doctor are not counted; the no-show rate is shown separately.</p>
+  <p th:if="${#lists.isEmpty(report.estimators())}" class="muted">No finished waits with a logged estimate yet.</p>
+  <table th:unless="${#lists.isEmpty(report.estimators())}">
+    <thead><tr><th>Estimator</th><th>Estimates</th><th>Mean error</th><th>Inside the shown range</th></tr></thead>
+    <tbody>
+    <tr th:each="e : ${report.estimators()}">
+      <td th:text="${e.estimator()}">ROLLING</td>
+      <td th:text="${e.predictions()}">120</td>
+      <td th:text="${#numbers.formatDecimal(e.maeMinutes(), 1, 1)} + ' min'">7.4 min</td>
+      <td th:text="${#numbers.formatDecimal(e.coverage() * 100, 1, 0)} + '%'">66%</td>
+    </tr>
+    </tbody>
+  </table>
+  <p>
+    Range widening factor: <strong th:text="${#numbers.formatDecimal(report.calibrationFactor(), 1, 1)}">1.5</strong>
+    (adjusted nightly toward 60 to 70% of waits inside the range) ·
+    No-show rate: <strong th:text="${#numbers.formatDecimal(report.noShowRate() * 100, 1, 0)} + '%'">6%</strong>
+  </p>
+
+  <h2>Models</h2>
+  <p class="muted">Trained nightly on days 60 to 8 before today and tested on the last 7 days. A model is used
+    only if it beats the one in use (or the rolling averages) by at least 5% on the wait.</p>
+  <p th:if="${#lists.isEmpty(report.models())}" class="muted">No model trained yet.</p>
+  <table th:unless="${#lists.isEmpty(report.models())}">
+    <thead>
+    <tr><th>Version</th><th>Model</th><th>Status</th><th>Trained</th><th>Test days</th><th>Samples</th>
+      <th>Consultation error</th><th>Wait error</th><th>Compared with</th></tr>
+    </thead>
+    <tbody>
+    <tr th:each="m : ${report.models()}">
+      <td th:text="${m.version()}">3</td>
+      <td th:text="${m.algorithm()}">CART</td>
+      <td th:text="${m.status()}">CHAMPION</td>
+      <td th:text="${m.trainedAt()}">2026-11-21 02:30 UTC</td>
+      <td th:text="${m.testFrom()} + ' to ' + ${m.testTo()}">2026-11-14 to 2026-11-20</td>
+      <td th:text="${m.trainingSamples()}">5000</td>
+      <td th:text="${m.serviceMaeMinutes() == null ? '' : #numbers.formatDecimal(m.serviceMaeMinutes(), 1, 2) + ' min'}">2.6 min</td>
+      <td th:text="${m.waitMaeMinutes() == null ? '' : #numbers.formatDecimal(m.waitMaeMinutes(), 1, 1) + ' min'}">7.4 min</td>
+      <td th:text="${m.baseline() == null ? '' : m.baseline() + ' (' + #numbers.formatDecimal(m.baselineWaitMaeMinutes(), 1, 1) + ' min)'}">ROLLING (7.4 min)</td>
+    </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

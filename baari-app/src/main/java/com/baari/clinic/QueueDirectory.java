@@ -35,6 +35,15 @@ public class QueueDirectory {
         this.doctors = doctors;
     }
 
+    /** Every clinic, for scheduled jobs that run per clinic (nightly model training). */
+    @Transactional(readOnly = true)
+    public java.util.List<ClinicView> allClinics() {
+        return clinics.findAll().stream()
+                .map(ClinicEntity::toView)
+                .sorted(Comparator.comparing(ClinicView::slug))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public Optional<QueueInfo> find(UUID queueId) {
         return queues.findById(queueId)

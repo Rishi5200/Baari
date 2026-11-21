@@ -55,10 +55,12 @@ public class EtaService {
     private final QueueDirectory directory;
     private final EtaProperties props;
     private final CalibrationStore calibration;
+    private final MlModelStore models;
     private final Clock clock;
 
     private final Map<UUID, Projected> projections = new ConcurrentHashMap<>();
     private final Map<UUID, LoadedEstimator> estimators = new ConcurrentHashMap<>();
+    private final Map<UUID, CachedChampion> champions = new ConcurrentHashMap<>();
     private final Map<UUID, Map<UUID, Held>> held = new ConcurrentHashMap<>();
 
     EtaService(
@@ -67,12 +69,14 @@ public class EtaService {
             QueueDirectory directory,
             EtaProperties props,
             CalibrationStore calibration,
+            MlModelStore models,
             Clock clock) {
         this.queues = queues;
         this.history = history;
         this.directory = directory;
         this.props = props;
         this.calibration = calibration;
+        this.models = models;
         this.clock = clock;
     }
 
@@ -82,6 +86,9 @@ public class EtaService {
 
     /** A clinic's estimator and range calibration factor, reloaded at most once a minute. */
     private record LoadedEstimator(Instant loadedAt, ServiceTimeEstimator estimator, double calibration) {}
+
+    /** The last champion read for a clinic; {@code champion} is empty if its artifact could not be loaded. */
+    private record CachedChampion(UUID modelId, Optional<MlModelStore.Champion> champion) {}
 
     /** The range a patient was last shown, and when. */
     private record Held(Instant shownAt, EtaSmoother.Shown shown) {}
@@ -194,11 +201,32 @@ public class EtaService {
                             .toList(),
                     props.minSamples(),
                     fallback);
-            loaded = new LoadedEstimator(
-                    now, rolling.hasEnoughData() ? rolling : fallback, calibration.factor(clinicId));
+            ServiceTimeEstimator statistics = rolling.hasEnoughData() ? rolling : fallback;
+            ServiceTimeEstimator chosen = champion(clinicId)
+                    .<ServiceTimeEstimator>map(c -> new MlEstimator(c.model(), c.version(), statistics))
+                    .orElse(statistics);
+            loaded = new LoadedEstimator(now, chosen, calibration.factor(clinicId));
             estimators.put(clinicId, loaded);
         }
         return loaded;
+    }
+
+    /**
+     * The clinic's champion model, read again only when a different model becomes champion (or after
+     * a restart). A model that failed to load is remembered as failed, so the alert is logged once.
+     */
+    private Optional<MlModelStore.Champion> champion(UUID clinicId) {
+        Optional<MlModelStore.ChampionRef> ref = models.championRef(clinicId);
+        if (ref.isEmpty()) {
+            champions.remove(clinicId);
+            return Optional.empty();
+        }
+        CachedChampion cached = champions.get(clinicId);
+        if (cached == null || !cached.modelId().equals(ref.get().id())) {
+            cached = new CachedChampion(ref.get().id(), models.load(ref.get()));
+            champions.put(clinicId, cached);
+        }
+        return cached.champion();
     }
 
     /** A finished consultation changes the clinic's statistics, so the next estimate reloads them. */

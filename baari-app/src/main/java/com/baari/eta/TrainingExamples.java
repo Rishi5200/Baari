@@ -73,4 +73,20 @@ public final class TrainingExamples {
         examples.sort(Comparator.comparing(Example::startedAt));
         return List.copyOf(examples);
     }
+
+    /** Finished consultations from days before {@code day}, newest first, as Rolling expects. */
+    public static List<RollingStatsEstimator.Sample> rollingSamples(
+            List<HistoricalToken> tokens, LocalDate day, ZoneId zone) {
+        return tokens.stream()
+                .filter(t -> t.serviceDate().isBefore(day) && t.hasServiceTime() && t.doctorId() != null)
+                .sorted(Comparator.comparing(HistoricalToken::consultStartedAt).reversed())
+                .map(t -> new RollingStatsEstimator.Sample(
+                        t.doctorId(),
+                        t.visitType(),
+                        t.consultStartedAt().atZone(zone).getHour(),
+                        (int) (t.completedAt().getEpochSecond()
+                                - t.consultStartedAt().getEpochSecond())))
+                .limit(5000)
+                .toList();
+    }
 }
