@@ -1,0 +1,35 @@
+# Weekly dependency updates (PLAN §9.5). Minor and patch updates come grouped in one PR per
+# ecosystem; major updates come one by one, since they need reading (Boot 4.2: ask first, CLAUDE.md §2).
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      maven-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Base images in the Dockerfile (Temurin JDK and JRE).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Images in ops/docker-compose*.yml (postgres, redis, kafka, caddy, prometheus, grafana).
+  - package-ecosystem: docker-compose
+    directory: /ops
+    schedule:
+      interval: weekly
+    groups:
+      compose-images:
+        update-types: [minor, patch]

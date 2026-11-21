@@ -3,7 +3,7 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 8 — Hardening & observability: built, all "Done when" items met (2026-11-21), tag after CI. Phases 1 to 4, 6 and 7 are tagged. Phase 5 is complete except the Telegram channel and its phone check, which the user deferred until all phases are done, so `phase-5` is not tagged.
+Phase 9 — Deploy & README: everything that can be done without a server is built and checked locally (2026-11-21). Open: the public deploy (needs a VM and a domain from the user) and the demo GIF/live link in the README. Phases 1 to 4 and 6 to 8 are tagged. Phase 5 is complete except the Telegram channel and its phone check, which the user deferred until all phases are done, so `phase-5` is not tagged.
 
 ## Phase 4 plan (all built, 2026-11-20)
 1. [x] Queue read models for ETA: `QueueLiveState`, `TokenLocator`, `ServiceSample`/`ServiceHistory` (queue module, no patient details); `EventLog.publish` also publishes the domain event in-process
@@ -152,8 +152,20 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 - [x] Fixed an estimator-cache race found by the full build (generation per clinic).
 - Not done: QR image on the TV and poster (needs a QR library such as ZXing; PLAN says ask first). OWASP dependency check / Dependabot in CI (PLAN 9.5) moves to Phase 9 with the deploy pipeline.
 
+## Phase 9 (2026-11-21, ADR 0015)
+- [x] Multi-stage `Dockerfile` (Temurin 21 JRE, non-root `baari` user, layered jar; second target `driver`); `.dockerignore`. App image 695 MB.
+- [x] `ops/docker-compose.prod.yml` (project `baari-prod`): app1 + app2, Caddy (only public ports 80/443), postgres, redis, kafka, nightly backup sidecar, optional `driver` (profile `demo`); `ops/Caddyfile`, `ops/backup.sh`, `ops/prod.env.example`, `ops/demo.env` (local demo: profiles `prod,dev`).
+- [x] Checked locally on the prod stack: both instances healthy, demo clinic seeded once; actuator 404 through Caddy; CSP and headers present; SSE through Caddy unbuffered; spoofed `X-Forwarded-For` does not dodge the login limit (429 after 10); `backup.sh once` wrote a 40 KB dump; TV board and join page work through Caddy with no console errors.
+- [x] Cross-instance fan-out on real instances: `ops/check-fanout.sh` holds a patient stream on app1, the doctor calls on app2, app1's stream gets CALLED (passes repeatedly, with the driver running).
+- [x] Demo activity: `SimulatorMain drive` plays reception and doctor through the staff API (`DrivePolicy` pure + `LiveDriver` HTTP, JDK only); `DrivePolicyTest` (14). Ran against the stack at speed 10 and in compose at speed 3.
+- [x] CI job `prod-stack`: builds images, `up --wait`, fan-out check, smoke checks through Caddy, backup; `.github/dependabot.yml` (maven, actions, docker, docker-compose; weekly, minor/patch grouped).
+- [x] README: problem, architecture (Mermaid), decisions with ADR links, ETA accuracy table, concurrency guarantees with test names, 3-command local run, deploy steps, stack, future work.
+- [ ] Public URL over HTTPS with the demo clinic and driver: needs a VM + domain (user). Steps are in the README "Deploying" section; on a real server create the clinic and a receptionist through the admin pages (the dev profile must not be used there).
+- [ ] README demo GIF and live link: after the deploy.
+- [ ] "A stranger can run it locally with 3 commands": the commands work here; CI's `prod-stack` job runs the same command on a clean machine (confirm on the first green run).
+
 ## Next
-1. Phase 9 — Deploy & README (Docker image, compose prod, Caddy, Dependabot/dependency check).
+1. Phase 9 — public deploy: needs a VM and a domain from the user; then README GIF and live link, tag `phase-9`.
 2. Phase 10 — pilot. Decide on ZXing for QR images (poster, rotating TV code).
 3. After all phases (user's instruction): Telegram channel, phone check, tag `phase-5`.
 4. Session timetable (product decision): would remove the short bias at JOIN (ADR 0012).

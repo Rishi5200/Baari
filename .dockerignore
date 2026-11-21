@@ -1,0 +1,14 @@
+**/target/
+build/
+.git/
+.idea/
+.vscode/
+*.iml
+.env
+.playwright-mcp/
+docs/
+load/
+ops/
+sim/*
+!sim/demo-clinic.json
+baari/

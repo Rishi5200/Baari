@@ -27,3 +27,35 @@ jobs:
         with:
           name: test-reports
           path: "**/target/*-reports/"
+
+  # Builds the images and runs the production stack (two app instances behind Caddy) the way the
+  # README tells a stranger to, then checks it: live updates cross instances, the actuator is not
+  # public, pages load through Caddy, a manual backup works.
+  prod-stack:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE: docker compose -f ops/docker-compose.prod.yml --env-file ops/demo.env
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build images and start the stack
+        run: $COMPOSE up -d --build --wait --wait-timeout 300
+
+      - name: Live updates cross instances
+        run: sh ops/check-fanout.sh
+
+      - name: Smoke checks through Caddy
+        run: |
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/login)" = 200
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/actuator/health)" = 404
+          curl -fsS http://localhost/api/public/queues/sharma-clinic/dr-sharma | grep -q '"queueId"'
+          $COMPOSE exec -T backup sh /backup.sh once
+
+      - name: Logs on failure
+        if: failure()
+        run: $COMPOSE logs --no-color --tail 200
+
+      - name: Stop the stack
+        if: always()
+        run: $COMPOSE down -v

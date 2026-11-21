@@ -148,6 +148,13 @@ psql "postgresql://baari:baari@localhost:5432/baari" -v csv=build/sim/tokens.csv
 # load test (k6 in Docker; app running with the dev profile and --baari.queue.max-open-tokens=2000)
 docker run --rm -i --add-host=host.docker.internal:host-gateway -v "$PWD/load:/load" grafana/k6:1.8.3 run /load/join-and-poll.js
 psql "postgresql://baari:baari@localhost:5432/baari" -f load/verify-numbering.sql
+
+# production stack locally (2 app instances, Caddy on :80, demo clinic, simulated reception); stop with down -v
+docker compose -f ops/docker-compose.prod.yml --env-file ops/demo.env up -d --build --wait
+sh ops/check-fanout.sh   # a stream on app1 must get a call made on app2
+
+# demo activity against any running app (password in BAARI_DRIVE_PASSWORD)
+java -cp baari-simulator/target/classes com.baari.simulator.SimulatorMain drive --base-url http://localhost --clinic sharma-clinic --queue dr-sharma --user reception --config sim/demo-clinic.json --speed 3
 ```
 
 Dev URLs: app http://localhost:8080 (actuator on :8086) · Grafana http://localhost:3000 (dashboard "Baari overview") · Prometheus http://localhost:9090.

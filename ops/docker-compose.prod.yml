@@ -1,0 +1,164 @@
+# Production stack (PLAN Phase 9): two app instances behind Caddy, plus postgres, redis, kafka and a
+# nightly database backup. Only Caddy publishes ports; the app, actuator and data stores stay on the
+# compose network (the rate limits trust X-Forwarded-For, which only Caddy may set: ADR 0014).
+#
+#   real deploy:  cp ops/prod.env.example ops/.env  (fill it in), then
+#                 docker compose -f ops/docker-compose.prod.yml --env-file ops/.env up -d --build
+#   local demo:   docker compose -f ops/docker-compose.prod.yml --env-file ops/demo.env up -d --build
+
+# Own project name: the dev compose file sits in the same folder, and without this both stacks
+# would share containers and the database volume.
+name: baari-prod
+
+x-app: &app
+  image: baari-app:${BAARI_IMAGE_TAG:-local}
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  environment:
+    SPRING_PROFILES_ACTIVE: ${BAARI_PROFILES:-prod}
+    BAARI_DB_URL: jdbc:postgresql://postgres:5432/baari
+    BAARI_DB_USER: baari
+    BAARI_DB_PASSWORD: ${BAARI_DB_PASSWORD:?set BAARI_DB_PASSWORD in the env file}
+    BAARI_REDIS_HOST: redis
+    BAARI_KAFKA_BOOTSTRAP: kafka:9092
+    # Required with the prod profile (startup fails if empty); the demo env file uses the dev profile's keys.
+    BAARI_DATA_KEY: ${BAARI_DATA_KEY:-}
+    BAARI_PHONE_PEPPER: ${BAARI_PHONE_PEPPER:-}
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://localhost:8086/actuator/health/readiness"]
+    interval: 10s
+    timeout: 3s
+    retries: 12
+    start_period: 30s
+
+services:
+  app1:
+    <<: *app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+  # Starts once app1 is ready, so Flyway and any startup seeding run on one instance at a time.
+  app2:
+    <<: *app
+    depends_on:
+      app1:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.10.2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      BAARI_SITE_ADDRESS: ${BAARI_SITE_ADDRESS:?set BAARI_SITE_ADDRESS in the env file}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app1:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: baari
+      POSTGRES_USER: baari
+      POSTGRES_PASSWORD: ${BAARI_DB_PASSWORD:?set BAARI_DB_PASSWORD in the env file}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U baari -d baari"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:4.0.0
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+
+  # Demo activity (profile "demo"): plays reception and doctor on the demo clinic's dr-sharma queue
+  # through the staff API, so visitors of the public demo see a moving queue. Off unless
+  # COMPOSE_PROFILES=demo; it needs the demo clinic and a receptionist login.
+  driver:
+    image: baari-driver:${BAARI_IMAGE_TAG:-local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: driver
+    profiles: [demo]
+    restart: unless-stopped
+    environment:
+      BAARI_DRIVE_PASSWORD: ${BAARI_DRIVE_PASSWORD:-}
+    command:
+      - --base-url
+      - http://app1:8080
+      - --clinic
+      - ${BAARI_DRIVE_CLINIC:-sharma-clinic}
+      - --queue
+      - ${BAARI_DRIVE_QUEUE:-dr-sharma}
+      - --user
+      - ${BAARI_DRIVE_USER:-reception}
+      - --speed
+      - ${BAARI_DRIVE_SPEED:-1}
+    depends_on:
+      app1:
+        condition: service_healthy
+
+  # Nightly pg_dump at 02:00 clinic time into BAARI_BACKUP_DIR on the host, keeping 14 days.
+  # Copying that directory off the machine (rclone, rsync, object storage) is the host's job.
+  backup:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: baari
+      PGDATABASE: baari
+      PGPASSWORD: ${BAARI_DB_PASSWORD:?set BAARI_DB_PASSWORD in the env file}
+      TZ: ${BAARI_BACKUP_TZ:-Asia/Kolkata}
+      KEEP_DAYS: ${BAARI_BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - ${BAARI_BACKUP_DIR:-./backups}:/backups
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  kafka-data:
+  caddy-data:
+  caddy-config:

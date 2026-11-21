@@ -2,16 +2,21 @@ package com.baari.simulator;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Entry point of the clinic simulator.
@@ -20,6 +25,10 @@ import java.util.Map;
  *
  * Writes one {@code tokens.csv} with a row per simulated patient. The last simulated day is
  * {@code --end} (default: yesterday is not guessed, so it is required for reproducible files).
+ *
+ * <pre>drive --base-url https://demo.example --clinic sharma-clinic --queue dr-sharma --user reception --config sim/demo-clinic.json</pre>
+ *
+ * Plays reception and doctor on a live queue through the staff API, in real time, forever.
  */
 public final class SimulatorMain {
 
@@ -28,12 +37,58 @@ public final class SimulatorMain {
 
     private SimulatorMain() {}
 
-    public static void main(String[] args) throws IOException {
-        if (args.length == 0 || !args[0].equals("generate")) {
-            System.err.println("usage: generate --config FILE --days N --out DIR --end YYYY-MM-DD [--seed N]");
-            System.exit(2);
+    public static void main(String[] args) throws IOException, InterruptedException {
+        String command = args.length == 0 ? "" : args[0];
+        switch (command) {
+            case "generate" -> generate(options(args));
+            case "drive" -> drive(options(args));
+            default -> {
+                System.err.println("""
+                        usage: generate --config FILE --days N --out DIR --end YYYY-MM-DD [--seed N]
+                               drive --base-url URL --clinic SLUG --queue SLUG --user NAME --config FILE
+                                     [--doctor INDEX] [--speed 1] [--max-waiting 6] [--tick-seconds 5] [--seed N]
+                                     (password in the BAARI_DRIVE_PASSWORD environment variable)""");
+                System.exit(2);
+            }
         }
-        Map<String, String> opts = options(args);
+    }
+
+    /**
+     * Drives a live queue as reception and doctor (PLAN Phase 9 demo activity). Arrivals use the
+     * config's average busy-hour rate times the doctor's share, at any hour of the day, so visitors
+     * of the public demo always see a moving queue.
+     */
+    private static void drive(Map<String, String> opts) throws IOException, InterruptedException {
+        SimConfig cfg = SimConfig.parse(Files.readString(Path.of(require(opts, "config"))));
+        SimConfig.Doctor doctor = cfg.doctors().get(Integer.parseInt(opts.getOrDefault("doctor", "0")));
+        String password = System.getenv("BAARI_DRIVE_PASSWORD");
+        if (password == null || password.isBlank()) {
+            throw new IllegalArgumentException("set BAARI_DRIVE_PASSWORD to the staff user's password");
+        }
+        DrivePolicy.Settings settings = new DrivePolicy.Settings(
+                doctor,
+                busyHourRate(cfg) * doctor.arrivalShare(),
+                cfg.newVisitShare(),
+                cfg.priorityShare(),
+                Integer.parseInt(opts.getOrDefault("max-waiting", "6")),
+                Double.parseDouble(opts.getOrDefault("speed", "1")));
+        long seed = Long.parseLong(opts.getOrDefault("seed", Long.toString(System.nanoTime())));
+        LiveDriver driver = new LiveDriver(
+                URI.create(require(opts, "base-url")),
+                require(opts, "clinic"),
+                require(opts, "queue"),
+                require(opts, "user"),
+                password);
+        Duration tick = Duration.ofSeconds(Long.parseLong(opts.getOrDefault("tick-seconds", "5")));
+        driver.run(new DrivePolicy(settings, new Random(seed)), tick, Clock.systemUTC());
+    }
+
+    /** Mean of the hourly arrival rates over the hours the clinic sees anyone. */
+    static double busyHourRate(SimConfig cfg) {
+        return Arrays.stream(cfg.arrivalsPerHour()).filter(r -> r > 0).average().orElse(0);
+    }
+
+    private static void generate(Map<String, String> opts) throws IOException {
         SimConfig cfg = SimConfig.parse(Files.readString(Path.of(require(opts, "config"))));
         int days = Integer.parseInt(require(opts, "days"));
         LocalDate end = LocalDate.parse(require(opts, "end"));

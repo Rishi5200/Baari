@@ -1,0 +1,23 @@
+# Public entry point (PLAN Phase 9). BAARI_SITE_ADDRESS is the domain (Caddy gets and renews the
+# HTTPS certificate itself) or http://localhost for the local demo.
+{$BAARI_SITE_ADDRESS} {
+	# Compress pages, but never the live-update streams (compression would hold events back).
+	@compressible not path */stream
+	encode @compressible zstd gzip
+
+	# Two instances, round robin. Staff sessions live in Redis and live updates fan out through Redis
+	# pub/sub, so no sticky sessions are needed. Caddy replaces any X-Forwarded-For the client sends
+	# with the client's address, which the rate limits rely on (ADR 0014).
+	reverse_proxy app1:8080 app2:8080 {
+		lb_policy round_robin
+		# Readiness lives on the management port, which is never proxied.
+		health_uri /actuator/health/readiness
+		health_port 8086
+		health_interval 10s
+		# Server-Sent Events: pass every event through at once.
+		flush_interval -1
+	}
+
+	# The actuator is not served on 8080 anyway; refuse the path outright.
+	respond /actuator* 404
+}
