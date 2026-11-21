@@ -26,6 +26,9 @@ x-app: &app
     # Required with the prod profile (startup fails if empty); the demo env file uses the dev profile's keys.
     BAARI_DATA_KEY: ${BAARI_DATA_KEY:-}
     BAARI_PHONE_PEPPER: ${BAARI_PHONE_PEPPER:-}
+    # First start only: creates this platform admin if it does not exist (ADR 0016).
+    BAARI_ADMIN_USERNAME: ${BAARI_ADMIN_USERNAME:-}
+    BAARI_ADMIN_PASSWORD: ${BAARI_ADMIN_PASSWORD:-}
   healthcheck:
     test: ["CMD", "curl", "-fsS", "http://localhost:8086/actuator/health/readiness"]
     interval: 10s

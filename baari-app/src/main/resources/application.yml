@@ -59,6 +59,10 @@ baari:
     data-key: ${BAARI_DATA_KEY:}         # base64 of 32 random bytes (AES-256)
     phone-pepper: ${BAARI_PHONE_PEPPER:} # base64 of at least 32 random bytes (HMAC)
     pii-retention-days: 30 # names and phones are removed from tokens older than this (PLAN §9.4)
+  bootstrap:
+    # First start on a real server: creates this PLATFORM_ADMIN if the username does not exist (ADR 0016).
+    admin-username: ${BAARI_ADMIN_USERNAME:}
+    admin-password: ${BAARI_ADMIN_PASSWORD:}
 
 logging:
   level:

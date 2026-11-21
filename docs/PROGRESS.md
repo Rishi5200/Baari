@@ -160,7 +160,8 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 - [x] Demo activity: `SimulatorMain drive` plays reception and doctor through the staff API (`DrivePolicy` pure + `LiveDriver` HTTP, JDK only); `DrivePolicyTest` (14). Ran against the stack at speed 10 and in compose at speed 3.
 - [x] CI job `prod-stack`: builds images, `up --wait`, fan-out check, smoke checks through Caddy, backup; `.github/dependabot.yml` (maven, actions, docker, docker-compose; weekly, minor/patch grouped).
 - [x] README: problem, architecture (Mermaid), decisions with ADR links, ETA accuracy table, concurrency guarantees with test names, 3-command local run, deploy steps, stack, future work.
-- [ ] Public URL over HTTPS with the demo clinic and driver: needs a VM + domain (user). Steps are in the README "Deploying" section; on a real server create the clinic and a receptionist through the admin pages (the dev profile must not be used there).
+- [x] First platform admin on a real server (ADR 0016): `PlatformAdminBootstrap` creates it from `BAARI_ADMIN_USERNAME`/`BAARI_ADMIN_PASSWORD` if the username does not exist; `PlatformAdminBootstrapIT` (4). Before this a fresh production database had no login. Checked on the stack with only the `prod` profile and a fresh database: admin created once, password not in logs, dev logins rejected, clinic created through the admin pages.
+- [ ] Public URL over HTTPS with the demo clinic and driver: needs a VM + domain (user). Steps are in the README "Deploying" section: fill `ops/.env`, start, log in as the platform admin, create the clinic, its doctors, queues and a receptionist (the dev profile must not be used there).
 - [ ] README demo GIF and live link: after the deploy.
 - [x] "A stranger can run it locally with 3 commands": works here, and CI's `prod-stack` job ran the same compose command on a clean GitHub runner, green on the first run (commit 445e1b5): stack healthy, fan-out check, smoke checks, backup.
 
@@ -169,6 +170,7 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 2. Phase 10 — pilot. Decide on ZXing for QR images (poster, rotating TV code).
 3. After all phases (user's instruction): Telegram channel, phone check, tag `phase-5`.
 4. Session timetable (product decision): would remove the short bias at JOIN (ADR 0012).
+5. A screen for a platform admin to change their own password (today it needs a database step, ADR 0016).
 
 ## Open questions for the user
 None. The four earlier questions were decided by Claude on 2026-11-20 and recorded in `docs/adr/0009-open-questions-resolved-after-phase-3.md`; the user can overrule them. Port 8080 on this machine is held by an unrelated process, so run locally with `--server.port=8081`.

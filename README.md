@@ -88,6 +88,7 @@ Each decision has an ADR in [`docs/adr/`](docs/adr):
 | The ETA reuses the real next-token policy to project the queue | The predicted order is always the order in which patients will actually be called | [0010](docs/adr/0010-eta-v1-rolling-stats-projection-and-prediction-log.md) |
 | Every model is backtested against a simple average on later days | An estimate is only worth showing if it beats "6 minutes per patient" | [0012](docs/adr/0012-simulator-backtest-and-range-calibration.md), [0013](docs/adr/0013-ml-consultation-length-model.md) |
 | Rate limits in Redis, CSP with nonces, actuator on a private port | Hardening before going public | [0014](docs/adr/0014-hardening-limits-headers-actuator.md) |
+| Two app instances behind Caddy, demo traffic from an external driver, first admin from the environment | Proves the fan-out on real instances; the app has no demo mode and no public setup page | [0015](docs/adr/0015-production-stack-and-demo-driver.md), [0016](docs/adr/0016-platform-admin-bootstrap.md) |
 
 ## How accurate is the estimate?
 
@@ -183,8 +184,10 @@ Grafana runs at http://localhost:3000 with the provisioned "Baari overview" dash
 
 To deploy on one VM with a domain:
 1. Copy [`ops/prod.env.example`](ops/prod.env.example) to `ops/.env` and fill in the domain, the
-   database password and the encryption keys.
+   database password, the encryption keys and your platform admin login.
 2. Run `docker compose -f ops/docker-compose.prod.yml --env-file ops/.env up -d --build`.
+3. Log in at `/login` as the platform admin (created on the first start), add the clinic and its
+   first admin under **Clinics**; the clinic admin then adds doctors, queues and staff.
 
 Caddy gets the HTTPS certificate. Only Caddy publishes ports; the actuator stays on the internal
 network. Nightly `pg_dump` files land in `BAARI_BACKUP_DIR` and should be copied off the machine.
