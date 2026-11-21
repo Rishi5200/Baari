@@ -3,7 +3,7 @@
 Update this file at the end of every Claude Code session.
 
 ## Current phase
-Phase 5 — Events & notifications (in progress, 2026-11-20). Done: outbox relay, dedup, DLT, planner, dispatcher, log and SMS-stub channels, actuals consumer (ADR 0011). Left: Telegram channel (waiting for a bot token from the user), full verify, CI, tag `phase-5`. Phases 1 to 4 complete, tagged `phase-1` to `phase-4`.
+Phase 6 — Simulator & backtesting: built, all "Done when" items met (2026-11-21), not tagged yet. Phase 5 is complete except the Telegram channel and its phone check (the user supplies the bot later), so `phase-5` is not tagged either. Phases 1 to 4 are tagged `phase-1` to `phase-4`.
 
 ## Phase 4 plan (all built, 2026-11-20)
 1. [x] Queue read models for ETA: `QueueLiveState`, `TokenLocator`, `ServiceSample`/`ServiceHistory` (queue module, no patient details); `EventLog.publish` also publishes the domain event in-process
@@ -122,7 +122,10 @@ That also skips `ModularityTest` (Modulith verify, a unit test) and the JaCoCo 1
 ## Phase 6 (started 2026-11-20)
 - [x] `baari-simulator`: discrete-event `DaySimulation` (per doctor and session, lognormal service times, hour and fatigue effects, late start, Poisson arrivals by hour, no-shows, same next-patient rules as the queue), hand-written `Json` reader (no new dependency), `generate` command writing `tokens.csv`, `sim/demo-clinic.json`. `SimulatorTest` (9) covers determinism by seed. 60 demo days: about 121 patients a day, median wait 31 min, p90 93 min.
 - [x] `com.baari.eta.Backtest` (pure, no Spring): `java -cp baari-app/target/classes com.baari.eta.Backtest --tokens build/sim/tokens.csv --out docs/eta-evaluation.md`. Replays the newest 14 of 60 days through the real `QueueProjector` at the production triggers; Rolling only sees earlier days. `BacktestTest` (4). Result: Rolling MAE 7.4 min vs Default 8.6 (13% lower), but both cover only about 45% against the 60% target and lean short. Gaps: late start, fatigue, no-show allowance, calibration. Full verify green (215 ITs + 9 simulator tests).
-- [ ] Import the CSV into the demo clinic (psql script), optional `drive`, fix the range coverage.
+- [x] Range calibration (PLAN 8.5, ADR 0012): pure `RangeCalibration` (+0.1 or -0.1 per night toward 60 to 70%, within 1.0 to 2.5, needs 50 scored predictions), `CalibrationStore` nightly job (02:45 UTC, last 14 days of `eta_prediction`, one step per clinic per day even with several instances), table `eta_calibration` (V6), used by `EtaService`. Backtest variant ROLLING+CALIBRATION: coverage 66%, mean error unchanged. No-show allowance tried and rejected (made the error worse). `RangeCalibrationTest` (7), 4 new EtaIT tests.
+- [x] History import: `sim/import-history.sql` (plain SQL) + `sim/import-history.psql` (`\copy` wrapper), `ImportHistoryIT` (4). Demo doctors renamed in `sim/demo-clinic.json` to match the dev seed. Imported into the local dev database: 118 days, 7,070 tokens for `sharma-clinic` (2 days already existed and were skipped; a rerun loads nothing).
+- [ ] Optional `drive` command (accelerated live day against a running app). Not built; useful for the README GIF in Phase 9.
+- Known gap (ADR 0012): estimates lean short, mostly at JOIN, because late session starts and joins before the doctor arrives are not modelled; the app has no session timetable. Product decision needed before Phase 7 compares the ML model.
 
 ## Next
 1. Finish Phase 5: Telegram channel, full verify, CI, tag. (Rolling statistics stay Postgres-backed with a one-minute cache, so no RollingStatsUpdater; see ADR 0011.)

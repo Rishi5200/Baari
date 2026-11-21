@@ -48,6 +48,10 @@ public final class Backtest {
 
     static final String DEFAULT = DefaultEstimator.NAME;
     static final String ROLLING = RollingStatsEstimator.NAME;
+    /** Rolling (or Default while history is short, as production does) with the nightly range calibration. */
+    static final String CALIBRATED = "ROLLING+CALIBRATION";
+
+    static final List<String> VARIANTS = List.of(DEFAULT, ROLLING, CALIBRATED);
     private static final int[] MILESTONES = {10, 5, 3, 1};
     private static final List<String> TRIGGERS =
             List.of("JOIN", "POSITION_10", "POSITION_5", "POSITION_3", "POSITION_1");
@@ -89,6 +93,9 @@ public final class Backtest {
         }
     }
 
+    /** One way of predicting: an estimator and the range widening factor it runs with. */
+    private record Variant(String name, ServiceTimeEstimator estimator, double calibration) {}
+
     record Settings(int testDays, int defaultServiceSeconds, int minSamples, int transitionGapSeconds, ZoneId zone) {}
 
     private Backtest() {}
@@ -114,9 +121,23 @@ public final class Backtest {
                 + result.testDays().size() + " test days; report written to " + out);
     }
 
-    record Result(List<LocalDate> trainDays, List<LocalDate> testDays, List<Observation> observations) {}
+    /**
+     * @param calibrationAtTestStart the calibrated variant's factor on the first scored day
+     * @param calibrationAtEnd its factor after the last day
+     */
+    record Result(
+            List<LocalDate> trainDays,
+            List<LocalDate> testDays,
+            List<Observation> observations,
+            double calibrationAtTestStart,
+            double calibrationAtEnd) {}
 
-    /** Replays the newest {@code testDays} days; the days before them only feed the Rolling estimator. */
+    /**
+     * Scores the newest {@code testDays} days. Every earlier day is replayed too, but only for the
+     * calibrated variant: it plays the nightly calibration job (PLAN 8.5), which after each day looks
+     * at the coverage of the last {@value RangeCalibration#WINDOW_DAYS} days and moves the factor one
+     * step. The days before a day also feed Rolling's statistics.
+     */
     static Result run(List<Row> rows, Settings settings) {
         TreeSet<LocalDate> allDays = rows.stream().map(Row::date).collect(Collectors.toCollection(TreeSet::new));
         if (allDays.size() <= settings.testDays()) {
@@ -127,20 +148,46 @@ public final class Backtest {
         List<LocalDate> train = days.subList(0, days.size() - settings.testDays());
         Map<LocalDate, List<Row>> byDay = rows.stream().collect(Collectors.groupingBy(Row::date));
 
-        List<Observation> all = new ArrayList<>();
-        for (LocalDate day : test) {
-            List<RollingStatsEstimator.Sample> history = samplesBefore(rows, day, settings.zone());
+        List<Observation> scored = new ArrayList<>();
+        java.util.ArrayDeque<List<Observation>> window = new java.util.ArrayDeque<>();
+        double factor = RangeCalibration.START;
+        double factorAtTestStart = factor;
+        for (LocalDate day : days) {
+            boolean isTest = !day.isBefore(test.get(0));
+            if (day.equals(test.get(0))) {
+                factorAtTestStart = factor;
+            }
             ServiceTimeEstimator fallback = new DefaultEstimator(settings.defaultServiceSeconds());
-            Map<String, ServiceTimeEstimator> estimators = new LinkedHashMap<>();
-            estimators.put(DEFAULT, fallback);
-            estimators.put(ROLLING, new RollingStatsEstimator(history, settings.minSamples(), fallback));
+            RollingStatsEstimator rolling = new RollingStatsEstimator(
+                    samplesBefore(rows, day, settings.zone()), settings.minSamples(), fallback);
+            ServiceTimeEstimator inUse = rolling.hasEnoughData() ? rolling : fallback;
+            List<Variant> variants = new ArrayList<>();
+            if (isTest) {
+                variants.add(new Variant(DEFAULT, fallback, 1.0));
+                variants.add(new Variant(ROLLING, rolling, 1.0));
+            }
+            variants.add(new Variant(CALIBRATED, inUse, factor));
+
+            List<Observation> dayObs = new ArrayList<>();
             Map<String, List<Row>> byDoctor = byDay.get(day).stream()
                     .collect(Collectors.groupingBy(Row::doctor, TreeMap::new, Collectors.toList()));
             for (Map.Entry<String, List<Row>> doctor : byDoctor.entrySet()) {
-                all.addAll(replay(doctor.getKey(), doctor.getValue(), estimators, settings));
+                dayObs.addAll(replay(doctor.getKey(), doctor.getValue(), variants, settings));
             }
+            if (isTest) {
+                scored.addAll(dayObs);
+            }
+            window.addLast(dayObs.stream()
+                    .filter(o -> o.estimator().equals(CALIBRATED))
+                    .toList());
+            if (window.size() > RangeCalibration.WINDOW_DAYS) {
+                window.removeFirst();
+            }
+            List<Observation> recent = window.stream().flatMap(List::stream).toList();
+            long covered = recent.stream().filter(Observation::covered).count();
+            factor = RangeCalibration.adjust(factor, covered, recent.size());
         }
-        return new Result(train, test, all);
+        return new Result(train, test, scored, factorAtTestStart, factor);
     }
 
     /** Finished consultations from days before {@code day}, newest first, as Rolling expects. */
@@ -161,9 +208,8 @@ public final class Backtest {
         return UUID.nameUUIDFromBytes(("doctor/" + name).getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Replays one doctor's day, one projection per estimator at every join or call. */
-    private static List<Observation> replay(
-            String doctor, List<Row> rows, Map<String, ServiceTimeEstimator> estimators, Settings settings) {
+    /** Replays one doctor's day, one projection per variant at every join or call. */
+    private static List<Observation> replay(String doctor, List<Row> rows, List<Variant> variants, Settings settings) {
         UUID doctorId = doctorId(doctor);
         List<Row> byCall =
                 rows.stream().sorted(Comparator.comparing(Row::calledAt)).toList();
@@ -175,7 +221,6 @@ public final class Backtest {
         Map<UUID, Row> byId = rows.stream().collect(Collectors.toMap(Row::id, Function.identity()));
         Map<UUID, Integer> joinPosition = new HashMap<>();
         Map<UUID, Set<String>> logged = new HashMap<>();
-        QueueProjector.Params params = new QueueProjector.Params(settings.transitionGapSeconds(), 0.0, 1.0);
 
         List<Observation> out = new ArrayList<>();
         for (Instant now : moments) {
@@ -217,14 +262,18 @@ public final class Backtest {
                     POLICY);
 
             Map<String, Map<UUID, QueueProjector.Projection>> projections = new LinkedHashMap<>();
-            for (Map.Entry<String, ServiceTimeEstimator> e : estimators.entrySet()) {
+            for (Variant v : variants) {
+                // no no-show allowance: a no-show still costs the doctor a few minutes of waiting
+                QueueProjector.Params params =
+                        new QueueProjector.Params(settings.transitionGapSeconds(), 0.0, v.calibration());
                 Map<UUID, QueueProjector.Projection> byToken = new HashMap<>();
-                QueueProjector.project(input, e.getValue(), params).forEach(p -> byToken.put(p.tokenId(), p));
-                projections.put(e.getKey(), byToken);
+                QueueProjector.project(input, v.estimator(), params).forEach(p -> byToken.put(p.tokenId(), p));
+                projections.put(v.name(), byToken);
             }
 
             // positions do not depend on the estimator, so any estimator's projection says who crossed what
-            for (QueueProjector.Projection p : projections.get(DEFAULT).values()) {
+            for (QueueProjector.Projection p :
+                    projections.get(variants.get(0).name()).values()) {
                 Row row = byId.get(p.tokenId());
                 Set<String> done = logged.computeIfAbsent(p.tokenId(), id -> new HashSet<>());
                 List<String> fired = new ArrayList<>();
@@ -341,7 +390,7 @@ public final class Backtest {
 
     static String report(Result result, Settings settings, String source) {
         StringBuilder md = new StringBuilder();
-        md.append("# ETA evaluation: Default vs Rolling\n\n");
+        md.append("# ETA evaluation: Default vs Rolling vs calibrated Rolling\n\n");
         md.append("Generated by `com.baari.eta.Backtest` from `").append(source).append("`. ");
         md.append("Do not edit by hand; rerun the backtest.\n\n");
         md.append("## Setup\n\n");
@@ -364,31 +413,45 @@ public final class Backtest {
                 "- Predictions are logged at the production triggers: JOIN and the first time a patient is within 10, 5, 3 and 1 places. Patients who never reached a consultation (no-shows) are not scored.\n");
         md.append("- The wait is the raw projector output (no display smoothing). Default assumes ")
                 .append(settings.defaultServiceSeconds() / 60)
-                .append(" min per consultation; both use a ")
+                .append(" min per consultation; all variants use a ")
                 .append(settings.transitionGapSeconds())
-                .append(" s gap between patients and no no-show allowance, as production does today.\n");
+                .append(" s gap between patients and no no-show allowance.\n");
+        md.append(String.format(
+                Locale.ROOT,
+                "- %s is what production runs: Rolling once the clinic has enough history, with the range widened by the "
+                        + "nightly calibration factor (PLAN 8.5: coverage of the last %d days, one step of %.1f per night "
+                        + "toward 60 to 70%%, kept within %.1f to %.1f). It was replayed over every day before the test "
+                        + "window as well; the factor was %.1f on the first scored day and %.1f after the last.%n",
+                CALIBRATED,
+                RangeCalibration.WINDOW_DAYS,
+                RangeCalibration.STEP,
+                RangeCalibration.MIN,
+                RangeCalibration.MAX,
+                result.calibrationAtTestStart(),
+                result.calibrationAtEnd()));
         md.append(
-                "- Error = predicted minus actual wait, in minutes. Bias above 0 means the estimate was too long. Coverage = share of actual waits inside the shown p20 to p80 range (the range is built to cover about 60%).\n\n");
+                "- Error = predicted minus actual wait, in minutes. Bias above 0 means the estimate was too long. Coverage = share of actual waits inside the shown range (the target is 60 to 70%).\n\n");
 
         Map<String, List<Observation>> byEstimator = result.observations().stream()
                 .collect(Collectors.groupingBy(Observation::estimator, TreeMap::new, Collectors.toList()));
         md.append("## Overall\n\n");
-        header(md, "Estimator");
-        for (String estimator : List.of(DEFAULT, ROLLING)) {
-            row(md, estimator, stats(byEstimator.getOrDefault(estimator, List.of())));
+        header(md, "Variant");
+        for (String variant : VARIANTS) {
+            row(md, variant, stats(byEstimator.getOrDefault(variant, List.of())));
         }
         md.append("\n## By trigger\n\n");
-        header(md, "Trigger / estimator");
+        header(md, "Trigger / variant");
         for (String trigger : TRIGGERS) {
-            for (String estimator : List.of(DEFAULT, ROLLING)) {
-                List<Observation> subset = byEstimator.getOrDefault(estimator, List.of()).stream()
+            for (String variant : VARIANTS) {
+                List<Observation> subset = byEstimator.getOrDefault(variant, List.of()).stream()
                         .filter(o -> o.trigger().equals(trigger))
                         .toList();
-                row(md, trigger + " / " + estimator, stats(subset));
+                row(md, trigger + " / " + variant, stats(subset));
             }
         }
         Stats d = stats(byEstimator.getOrDefault(DEFAULT, List.of()));
         Stats r = stats(byEstimator.getOrDefault(ROLLING, List.of()));
+        Stats c = stats(byEstimator.getOrDefault(CALIBRATED, List.of()));
         md.append("\n## Reading\n\n");
         md.append(String.format(
                 Locale.ROOT,
@@ -399,15 +462,17 @@ public final class Backtest {
                 r.maeMin() <= d.maeMin() ? "lower" : "higher"));
         md.append(String.format(
                 Locale.ROOT,
-                "The shown range holds the actual wait %.0f%% of the time for Rolling and %.0f%% for Default.%n",
+                "Without calibration the shown range holds the actual wait %.0f%% of the time (Rolling) and %.0f%% "
+                        + "(Default), short of the 60%% target; with calibration it holds it %.0f%% of the time. "
+                        + "Calibration only widens the range; it does not move the estimate, so the mean error stays the same.%n",
                 100 * r.coverage(),
-                100 * d.coverage()));
+                100 * d.coverage(),
+                100 * c.coverage()));
         md.append(
-                        "\nThe range is meant to hold about 60% of actual waits, so both are too narrow, and both lean short ")
-                .append("(negative bias, worst at JOIN). The projector does not yet model late session starts, ")
-                .append(
-                        "a doctor slowing down through a session or no-shows, and it has no calibration factor (PLAN 8.5). ")
-                .append("These are the first things to fix before an ML model is compared with Rolling.\n");
+                "\nAll variants lean short (negative bias, worst at JOIN). Two causes are known and not modelled: "
+                        + "doctors start sessions late, and patients who join before the session are projected as if the "
+                        + "doctor were already there (the app stores no session timetable yet). Allowing for no-shows was "
+                        + "tried and made the error worse here, because a no-show still costs the doctor a few minutes of waiting.\n");
         return md.toString();
     }
 

@@ -137,7 +137,13 @@ docker compose -f ops/docker-compose.yml up -d
 ./mvnw -pl baari-app test -Dgroups=unit
 
 # simulator: generate 60 days of synthetic history for the demo clinic
-./mvnw -pl baari-simulator exec:java -Dexec.args="generate --config sim/demo-clinic.json --days 60 --out build/sim"
+./mvnw -pl baari-simulator exec:java -Dexec.args="generate --config sim/demo-clinic.json --days 60 --end 2026-11-20 --out build/sim"
+
+# load it into the dev database (demo clinic must exist: run the app once with the dev profile)
+psql "postgresql://baari:baari@localhost:5432/baari" -v csv=build/sim/tokens.csv -f sim/import-history.psql
+
+# backtest: Default vs Rolling vs calibrated Rolling, writes docs/eta-evaluation.md
+./mvnw -pl baari-app compile && java -cp baari-app/target/classes com.baari.eta.Backtest --tokens build/sim/tokens.csv --out docs/eta-evaluation.md
 
 # load test
 k6 run load/join-and-poll.js

@@ -186,6 +186,18 @@ class NotificationIT extends AbstractIntegrationTest {
                 .single();
     }
 
+    /**
+     * Sends everything due, batch after batch. The planner's consumer group starts at the beginning
+     * of the topic, so in a full build it first plans rows for the events of every earlier test
+     * class; one batch may hold only those. A retried row is due again only after its backoff, so
+     * draining never makes extra attempts.
+     */
+    private void dispatchAll() {
+        while (dispatcher.dispatchDue() > 0) {
+            // next batch
+        }
+    }
+
     private void awaitPlanned(UUID tokenId, String kind) {
         await().atMost(Duration.ofSeconds(30)).until(() -> rows(tokenId, kind) == 1);
     }
@@ -204,7 +216,7 @@ class NotificationIT extends AbstractIntegrationTest {
                 .as("fourth is 4th in line")
                 .isZero();
 
-        dispatcher.dispatchDue();
+        dispatchAll();
         assertThat(channel.sentTo(first.tokenId())).singleElement().satisfies(text -> {
             assertThat(text).contains(first.displayCode());
             assertThat(text).contains("0 patients ahead");
@@ -217,7 +229,7 @@ class NotificationIT extends AbstractIntegrationTest {
         actions.callNext(doctor, queue, null);
         awaitPlanned(first.tokenId(), "CALLED");
         awaitPlanned(fourth.tokenId(), "NEAR_TURN"); // the line moved up
-        dispatcher.dispatchDue();
+        dispatchAll();
 
         assertThat(channel.sentTo(first.tokenId())).anyMatch(t -> t.contains("it is your turn"));
         assertThat(status(first.tokenId(), "CALLED")).isEqualTo("SENT");
@@ -234,7 +246,7 @@ class NotificationIT extends AbstractIntegrationTest {
         awaitPlanned(second.tokenId(), "NEAR_TURN");
 
         actions.cancel(receptionist, first.tokenId());
-        dispatcher.dispatchDue();
+        dispatchAll();
 
         assertThat(status(first.tokenId(), "NEAR_TURN")).isEqualTo("SKIPPED");
         assertThat(channel.sentTo(first.tokenId())).isEmpty();
@@ -247,7 +259,7 @@ class NotificationIT extends AbstractIntegrationTest {
         channel.failuresLeft.put(only.tokenId(), new AtomicInteger(5));
         awaitPlanned(only.tokenId(), "NEAR_TURN");
 
-        dispatcher.dispatchDue();
+        dispatchAll();
 
         assertThat(status(only.tokenId(), "NEAR_TURN")).isEqualTo("PENDING");
         assertThat(jdbc.sql("""
@@ -259,7 +271,7 @@ class NotificationIT extends AbstractIntegrationTest {
 
         for (int attempt = 2; attempt <= 5; attempt++) {
             makeDueNow(only.tokenId());
-            dispatcher.dispatchDue();
+            dispatchAll();
         }
 
         assertThat(status(only.tokenId(), "NEAR_TURN")).isEqualTo("FAILED");
@@ -278,10 +290,10 @@ class NotificationIT extends AbstractIntegrationTest {
         channel.failuresLeft.put(only.tokenId(), new AtomicInteger(1));
         awaitPlanned(only.tokenId(), "NEAR_TURN");
 
-        dispatcher.dispatchDue();
+        dispatchAll();
         assertThat(status(only.tokenId(), "NEAR_TURN")).isEqualTo("PENDING");
         makeDueNow(only.tokenId());
-        dispatcher.dispatchDue();
+        dispatchAll();
 
         assertThat(status(only.tokenId(), "NEAR_TURN")).isEqualTo("SENT");
         assertThat(channel.sentTo(only.tokenId())).hasSize(1);
@@ -312,7 +324,7 @@ class NotificationIT extends AbstractIntegrationTest {
         IssuedToken later = walkIn();
         awaitPlanned(later.tokenId(), "NEAR_TURN");
 
-        dispatcher.dispatchDue();
+        dispatchAll();
 
         assertThat(rows(first.tokenId(), "CALLED")).isEqualTo(1);
         assertThat(channel.sentTo(first.tokenId()).stream().filter(t -> t.contains("it is your turn")))
@@ -329,13 +341,13 @@ class NotificationIT extends AbstractIntegrationTest {
     void patientsStillOpenWhenTheDayClosesAreToldTheQueueHasClosed() {
         IssuedToken waiting = walkIn();
         awaitPlanned(waiting.tokenId(), "NEAR_TURN");
-        dispatcher.dispatchDue();
+        dispatchAll();
         StaffPrincipal admin =
                 new StaffPrincipal(UUID.randomUUID(), "admin", StaffRole.CLINIC_ADMIN, receptionist.clinicId(), null);
 
         days.close(admin, queue);
         awaitPlanned(waiting.tokenId(), "QUEUE_CLOSED");
-        dispatcher.dispatchDue();
+        dispatchAll();
 
         assertThat(channel.sentTo(waiting.tokenId())).anyMatch(t -> t.contains("queue has closed"));
     }

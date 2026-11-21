@@ -54,6 +54,7 @@ public class EtaService {
     private final ServiceHistory history;
     private final QueueDirectory directory;
     private final EtaProperties props;
+    private final CalibrationStore calibration;
     private final Clock clock;
 
     private final Map<UUID, Projected> projections = new ConcurrentHashMap<>();
@@ -65,11 +66,13 @@ public class EtaService {
             ServiceHistory history,
             QueueDirectory directory,
             EtaProperties props,
+            CalibrationStore calibration,
             Clock clock) {
         this.queues = queues;
         this.history = history;
         this.directory = directory;
         this.props = props;
+        this.calibration = calibration;
         this.clock = clock;
     }
 
@@ -77,7 +80,8 @@ public class EtaService {
     record Projected(
             String estimator, QueueLiveState state, Instant at, Map<UUID, QueueProjector.Projection> byToken) {}
 
-    private record LoadedEstimator(Instant loadedAt, ServiceTimeEstimator estimator) {}
+    /** A clinic's estimator and range calibration factor, reloaded at most once a minute. */
+    private record LoadedEstimator(Instant loadedAt, ServiceTimeEstimator estimator, double calibration) {}
 
     /** The range a patient was last shown, and when. */
     private record Held(Instant shownAt, EtaSmoother.Shown shown) {}
@@ -148,14 +152,16 @@ public class EtaService {
         }
         PublicQueue queue = directory.findPublic(queueId).orElseThrow();
         ZoneId zone = queue.info().timezone();
-        ServiceTimeEstimator estimator = estimatorFor(state.clinicId(), zone, now);
+        LoadedEstimator loaded = loaded(state.clinicId(), zone, now);
+        ServiceTimeEstimator estimator = loaded.estimator();
 
         Map<UUID, QueueProjector.Projection> byToken = new LinkedHashMap<>();
         if (state.status() != QueueDayStatus.CLOSED) {
             QueueProjector.project(
                             input(state, queue, zone, now),
                             estimator,
-                            new QueueProjector.Params(props.transitionGapSeconds(), props.noShowRate(), 1.0))
+                            new QueueProjector.Params(
+                                    props.transitionGapSeconds(), props.noShowRate(), loaded.calibration()))
                     .forEach(p -> byToken.put(p.tokenId(), p));
         }
         Projected fresh = new Projected(estimator.name(), state, now, byToken);
@@ -169,6 +175,10 @@ public class EtaService {
 
     /** The estimator in use for a clinic: its own statistics if there is enough history, else the default. */
     ServiceTimeEstimator estimatorFor(UUID clinicId, ZoneId zone, Instant now) {
+        return loaded(clinicId, zone, now).estimator();
+    }
+
+    private LoadedEstimator loaded(UUID clinicId, ZoneId zone, Instant now) {
         LoadedEstimator loaded = estimators.get(clinicId);
         if (loaded == null || Duration.between(loaded.loadedAt(), now).compareTo(HISTORY_TTL) >= 0) {
             List<ServiceSample> samples =
@@ -184,10 +194,11 @@ public class EtaService {
                             .toList(),
                     props.minSamples(),
                     fallback);
-            loaded = new LoadedEstimator(now, rolling.hasEnoughData() ? rolling : fallback);
+            loaded = new LoadedEstimator(
+                    now, rolling.hasEnoughData() ? rolling : fallback, calibration.factor(clinicId));
             estimators.put(clinicId, loaded);
         }
-        return loaded.estimator();
+        return loaded;
     }
 
     /** A finished consultation changes the clinic's statistics, so the next estimate reloads them. */

@@ -1,0 +1,25 @@
+-- Load simulated history into a clinic. Run from the repository root:
+--
+--   psql "postgresql://baari:baari@localhost:5432/baari" -v csv=build/sim/tokens.csv -f sim/import-history.psql
+--
+-- Optional: -v clinic=<slug> (default sharma-clinic, the dev seed). The clinic and its doctors must
+-- exist (start the app once with the dev profile). Safe to rerun: days already loaded are skipped.
+\set ON_ERROR_STOP on
+\if :{?clinic}
+\else
+  \set clinic sharma-clinic
+\endif
+
+BEGIN;
+CREATE TEMP TABLE sim_settings (clinic_slug text NOT NULL) ON COMMIT DROP;
+INSERT INTO sim_settings VALUES (:'clinic');
+CREATE TEMP TABLE sim_token (
+  service_date date, doctor text, number int, visit_type text, priority text, source text, status text,
+  joined_at timestamptz, called_at timestamptz, consult_started_at timestamptz, completed_at timestamptz
+) ON COMMIT DROP;
+-- \copy takes the rest of its line literally (no :variables), so the command is built first
+\set copy_cmd '\\copy sim_token FROM ' :'csv' ' WITH (FORMAT csv, HEADER true, NULL '''')'
+:copy_cmd
+\ir import-history.sql
+SELECT count(*) AS queue_days_loaded FROM sim_day;
+COMMIT;

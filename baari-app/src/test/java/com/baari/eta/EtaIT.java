@@ -98,6 +98,9 @@ class EtaIT extends AbstractIntegrationTest {
     @Autowired
     JsonMapper json;
 
+    @Autowired
+    CalibrationStore calibration;
+
     StaffPrincipal admin;
     StaffPrincipal receptionist;
     StaffPrincipal doctor;
@@ -451,5 +454,82 @@ class EtaIT extends AbstractIntegrationTest {
         assertThat(row.get("range_min_s")).isEqualTo(551);
         assertThat(row.get("range_max_s")).isEqualTo(1009);
         assertThat(row.get("estimator")).isEqualTo("DEFAULT");
+    }
+
+    // ---- range calibration (PLAN 8.5, ADR 0012) ----
+
+    /** 15 waiting patients with 4 scored predictions each: 60 predictions, {@code covered} of them hit. */
+    private void scoredPredictions(int covered) {
+        List<UUID> waiting = new ArrayList<>();
+        for (int i = 0; i < 15; i++) {
+            waiting.add(walkIn().tokenId());
+        }
+        String[] triggers = {"POSITION_10", "POSITION_5", "POSITION_3", "POSITION_1"};
+        int n = 0;
+        for (UUID tokenId : waiting) {
+            for (String trigger : triggers) {
+                int actual = n++ < covered ? 600 : 2000; // range is 500 to 700
+                db().sql("""
+                                INSERT INTO eta_prediction (id, token_id, clinic_id, predicted_at, trigger, position,
+                                    predicted_wait_s, range_min_s, range_max_s, estimator, actual_wait_s)
+                                VALUES (?, ?, ?, ?, ?, 1, 600, 500, 700, 'DEFAULT', ?)
+                                """)
+                        .params(
+                                UUID.randomUUID(),
+                                tokenId,
+                                admin.clinicId(),
+                                java.time.OffsetDateTime.ofInstant(CLOCK.instant(), java.time.ZoneOffset.UTC),
+                                trigger,
+                                actual)
+                        .update();
+            }
+        }
+    }
+
+    @Test
+    void anUncalibratedClinicUsesTheProjectorsRangeUnchanged() {
+        assertThat(calibration.factor(admin.clinicId())).isEqualTo(1.0);
+    }
+
+    @Test
+    void nightlyCalibrationWidensTooNarrowRangesOneStepPerDay() {
+        scoredPredictions(24); // 40% covered, below the 60% target
+
+        calibration.recalibrate();
+        assertThat(calibration.factor(admin.clinicId())).isEqualTo(1.1);
+
+        calibration.recalibrate(); // a second instance, or a rerun, on the same day changes nothing
+        assertThat(calibration.factor(admin.clinicId())).isEqualTo(1.1);
+
+        CLOCK.advance(Duration.ofDays(1));
+        calibration.recalibrate();
+        assertThat(calibration.factor(admin.clinicId())).isEqualTo(1.2);
+    }
+
+    @Test
+    void rangesNarrowWhenTheyHoldTooManyActualWaitsButNeverBelowOne() {
+        scoredPredictions(54); // 90% covered
+        calibration.recalibrate();
+        assertThat(calibration.factor(admin.clinicId())).isEqualTo(1.0);
+    }
+
+    @Test
+    void theCalibrationFactorWidensTheRangesPatientsAreShown() {
+        scoredPredictions(24);
+        QueueProjector.Projection before = eta.projectQueue(queue).orElseThrow().byToken().values().stream()
+                .filter(p -> p.position() == 5)
+                .findFirst()
+                .orElseThrow();
+
+        calibration.recalibrate(); // factor 1.1
+        CLOCK.advance(Duration.ofMinutes(2)); // past the one-minute estimator cache and the projection cache
+
+        QueueProjector.Projection after = eta.projectQueue(queue).orElseThrow().byToken().values().stream()
+                .filter(p -> p.position() == 5)
+                .findFirst()
+                .orElseThrow();
+        double widthBefore = before.rangeMaxSeconds() - before.rangeMinSeconds();
+        double widthAfter = after.rangeMaxSeconds() - after.rangeMinSeconds();
+        assertThat(widthAfter / widthBefore).isCloseTo(1.1, org.assertj.core.data.Offset.offset(0.02));
     }
 }
